@@ -1,11 +1,11 @@
 from Detector import Detector
-from DetectorManager import DetectorManager
-from HierarchalDetector import HierarchalDetector
+from DetectorLayer import DetectorLayer
+from LayerGenerator import LayerGenerator
 
 
 def load_mult_detector_graph():
     # Loading in all the data form A11Benchmark into detector classes
-    manager = DetectorManager()
+    manager = DetectorLayer(1)
     for i in range(1, 68):
         manager.add_detector("low_level_detector",
                              "data/A1Benchmark/real_"+str(i)+".csv")
@@ -45,12 +45,22 @@ def rho_estimation(rho_value_to_test):
 
 def load_mult_detector_group_and_cluster():
     # Loading in all the data form A11Benchmark into detector classes
-    manager = DetectorManager()
+    manager = DetectorLayer(1)
     for i in range(1, 68):
         manager.add_detector("low_level_detector",
                              "data/A1Benchmark/real_"+str(i)+".csv")
-    g = HierarchalDetector(manager)
+    g = LayerGenerator(manager)
     print(g.group_and_cluster())
+
+
+def load_mult_detector_group_create_layer():
+    # Loading in all the data form A11Benchmark into detector classes
+    manager = DetectorLayer(1)
+    for i in range(1, 68):
+        manager.add_detector("low_level_detector",
+                             "data/A1Benchmark/real_"+str(i)+".csv")
+    g = LayerGenerator(manager)
+    g.create_new_layer(1)
 
 
 # load_mult_detector_graph()
@@ -63,4 +73,5 @@ def load_mult_detector_group_and_cluster():
 
 # rho_estimation(1.5)
 
-load_mult_detector_group_and_cluster()
+# load_mult_detector_group_and_cluster()
+load_mult_detector_group_create_layer()
