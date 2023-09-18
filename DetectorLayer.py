@@ -1,14 +1,16 @@
 from Detector import Detector
 import matplotlib.pyplot as plt
 import numpy as np
+import networkx as nx
+import os
 
 
-class DetectorManager:
-    def __init__(self):
+class DetectorLayer:
+    def __init__(self, layer_number):
         self.MPL_COLORS = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
         self.mDetector_map = dict()
-        self.mNext_available_id = 0
         self.mCurrentTime = 1
+        self.mLayerNumber = layer_number
 
     # Calls the next() method in all of the Detector objects being tracked
     def next(self):
@@ -20,12 +22,16 @@ class DetectorManager:
         return
 
     # Add a detector that is being watched
-    def add_detector(self, detector_type, file_name):
-        temp_detector = Detector(self.mNext_available_id, detector_type, 1)
+    def add_detector(self, detector_type, detector_id, file_name=None, loaded_data=None, interval=None, lower_level_detectors=None):
+        temp_detector = Detector(
+            detector_id, detector_type, self.mLayerNumber, lower_level_detectors)
         if file_name is not None:
             temp_detector.load_from_file(file_name)
-        self.mDetector_map.update({self.mNext_available_id: temp_detector})
-        self.mNext_available_id += 1
+        if loaded_data is not None:
+            temp_detector.load_from_memory(interval, loaded_data)
+        self.mDetector_map.update({detector_id: temp_detector})
+        if detector_id == 69:
+            temp_detector.graph_data()
         return True
 
     # Remove one specific detector based on ID
@@ -87,3 +93,11 @@ class DetectorManager:
             _, y_data, _ = self.mDetector_map[detector].create_data()
             answer.append(y_data[:700])
         return np.transpose(np.array(answer))
+
+    def save(self):
+        for detector_id in self.mDetector_map:
+            if os.path.exists("hierarchy/layer"+str(self.mLayerNumber)) == False:
+                os.makedirs("hierarchy/layer"+str(self.mLayerNumber))
+            self.mDetector_map[detector_id].save_history(
+                "hierarchy/layer"+str(self.mLayerNumber)+"/detector"+str(detector_id)+"_id.csv")
+        return True

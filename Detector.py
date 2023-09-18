@@ -6,7 +6,7 @@ import math
 
 
 class Detector:
-    def __init__(self, id, detector_type, detector_level):
+    def __init__(self, id, detector_type, detector_level, lower_level_detectors):
         self.mName = ""
         self.mID = id
         self.mHistory = dict()
@@ -15,9 +15,10 @@ class Detector:
         self.mRules = []
         self.mDetectorLevel = detector_level
         self.mDetector_type = detector_type
-        self.x_data = None
-        self.y_data = None
+        self.mX_data = None
+        self.mY_data = None
         self.anomaly_data = None
+        self.mLowerLevelDetectorIDs = lower_level_detectors
 
     #
     def squared_hellinger_distance(self, lambda_p, lambda_q, rho):
@@ -65,6 +66,9 @@ class Detector:
         self.mRules.append(Rule(is_numeric, error_range))
 
     def check_rules(self, timestamp):
+        if not isinstance(self.mHistory[timestamp], list):
+            print("[Error]: No rules exist")
+            return False
         for rule in self.mRules:
             if rule.is_valid(self.mHistory[timestamp][self.mColumns_mapping["value"]]) == False:
                 return False
@@ -141,26 +145,35 @@ class Detector:
 
     # Create the x,y and anomaly data for the .csv file
     def create_data(self, x_range=None):
-        if self.x_data is not None and self.y_data is not None and self.anomaly_data is not None:
-            return self.x_data, self.y_data, self.anomaly_data
+        if self.mX_data is not None and self.mY_data is not None and self.anomaly_data is not None:
+            return self.mX_data, self.mY_data, self.anomaly_data
         x_data = []
         y_data = []
         anomaly_data = []
         for timestamp in self.mHistory:
             if (x_range is not None and x_range[0] <= int(timestamp) and int(timestamp) < x_range[1]) or x_range is None:
                 x_data.append(int(timestamp))
-                y_data.append(float(
-                    self.mHistory[timestamp][self.mColumns_mapping["value"]]))
-                if int(self.mHistory[timestamp][self.mColumns_mapping["is_anomaly"]]) == 1:
+                if isinstance(self.mHistory[timestamp], list):
+                    y_data.append(float(
+                        self.mHistory[timestamp][self.mColumns_mapping["value"]]))
+                else:
+                    y_data.append(float(self.mHistory[timestamp]))
+                if isinstance(self.mHistory[timestamp], list) and int(self.mHistory[timestamp][self.mColumns_mapping["is_anomaly"]]) == 1:
                     anomaly_data.append((int(timestamp), float(
                         self.mHistory[timestamp][self.mColumns_mapping["value"]])))
-        self.x_data = x_data
-        self.y_data = y_data
+        self.mX_data = x_data
+        self.mY_data = y_data
         self.anomaly_data = anomaly_data
         return x_data, y_data, anomaly_data
 
+    def load_from_memory(self, timestamps, data):
+        for i in range(0, len(data)):
+            self.mHistory.update({timestamps[i]: (data[i])})
+        return
+
     # Only graph the 0,1's of the anomaly values
-    def graph_anomaly(self, x_range):
+
+    def graph_anomaly(self, x_range=None):
         x_data = []
         anomaly_data = []
         for timestamp in self.mHistory:
@@ -173,3 +186,15 @@ class Detector:
         plt.ylabel('Anomaly')
         plt.title('Anomaly over time for detector:' + str(self.mID))
         plt.show()
+
+    def save_history(self, file_location):
+        with open(file_location, 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(["Timestamp", "value"])
+            rows = []
+            for idx in self.mHistory:
+                rows.append([idx, self.mHistory[idx]])
+            writer.writerows(rows)
+        print("Finished saving detector " +
+              str(self.mID) + " history to file.")
+        return True
