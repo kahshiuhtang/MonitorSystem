@@ -20,9 +20,10 @@ for i in range(1, 68):
     files.append("data/A1Benchmark/real_"+str(i)+".csv")
 hManager.create_base_layer(files=files)
 hManager.create_higher_level_layers()
-hManager.display_structure()
+hManager.display_structure2()
 hManager.save_graph_structure()
 hManager.save_higher_level_detector_data()
+print(hManager.find_order())
 """
 """
 # Loading data

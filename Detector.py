@@ -53,7 +53,7 @@ class Detector:
             if threshold < dissimilarity:
                 points.append((x_data[idx], y_data[idx]))
             if dissimilarity > maximum_value:
-                maximum_value = dissimilarity
+                maximum_value = y_data[idx]
                 max_timestamp = idx
         return points, maximum_value, max_timestamp
 
@@ -138,6 +138,9 @@ class Detector:
         for anomaly in anomaly_data:
             plt.plot(anomaly[0], anomaly[1], marker="x", markersize=5,
                      markeredgecolor="red", markerfacecolor="green")
+        _, maxY, maxX = self.run_time_series(x_data, y_data, 0.000005)
+        plt.plot(maxX, maxY, marker="x", markersize=5,
+                 markeredgecolor="red", markerfacecolor="green")
         plt.xlabel('Timestamp')
         plt.ylabel('Value')
         plt.title('Values over time for detector:' + str(self.mID))

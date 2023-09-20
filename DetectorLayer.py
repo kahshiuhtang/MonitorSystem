@@ -30,7 +30,7 @@ class DetectorLayer:
         if loaded_data is not None:
             temp_detector.load_from_memory(interval, loaded_data)
         self.mDetector_map.update({detector_id: temp_detector})
-        if detector_id == 69:
+        if detector_id == 80:
             temp_detector.graph_data()
         return True
 
