@@ -1,5 +1,7 @@
 import sys
+import os
 from HierarchalManager import HierarchalManager
+import numpy as np
 # Steps
 # 1) Data should be stored for 15 days
 # 2) Service will run every 15 minutes
@@ -16,10 +18,18 @@ from HierarchalManager import HierarchalManager
 
 hManager = HierarchalManager()
 files = []
-for i in range(1, 68):
-    files.append("data/A1Benchmark/real_"+str(i)+".csv")
+
+path = r'test-pci'
+extension = '.csv'
+
+for root, dirs_list, files_list in os.walk(path):
+    for file_name in files_list:
+        if os.path.splitext(file_name)[-1] == extension:
+            file_name_path = os.path.join(root, file_name)
+            files.append("test-pci/" + file_name)
 hManager.create_base_layer(files=files)
 hManager.create_higher_level_layers()
+"""
 hManager.display_structure2()
 hManager.save_graph_structure()
 hManager.save_higher_level_detector_data()
@@ -30,3 +40,4 @@ print(hManager.find_order())
 # Load in graph structure
 hManager = HierarchalManager()
 hManager.load_hierarchy("hierarchy/hierarchy_graph.json")
+"""

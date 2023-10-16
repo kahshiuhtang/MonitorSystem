@@ -7,6 +7,7 @@ from sklearn.covariance import GraphicalLasso
 from sklearn.cluster import AffinityPropagation
 from sklearn import preprocessing
 from sklearn import linear_model
+import skfuzzy as fuzz
 
 
 class LayerGenerator:
@@ -19,7 +20,7 @@ class LayerGenerator:
     def get_interval(self):
         ans = []
         if self.mManager:
-            ans, _, _ = list(self.mManager.mDetector_map.values())[
+            ans, _ = list(self.mManager.mDetector_map.values())[
                 0].create_data()
         return ans
 
@@ -27,13 +28,14 @@ class LayerGenerator:
         X = self.mManager.generate_detector_data_array()
         scaler = preprocessing.StandardScaler().fit(X)
         X_scaled = scaler.transform(X)
-        cov = GraphicalLasso(alpha=0.05,
-                             max_iter=2000).fit(X_scaled)
+        cov = GraphicalLasso(alpha=1, tol=0.0001,
+                             max_iter=4500).fit(X_scaled)
         print("Finished grouping layer")
         return np.around(cov.covariance_, decimals=3)
 
     def cluster(self, X):
         clustering = AffinityPropagation(random_state=5).fit_predict(X)
+        exit()
         detector_list = list(self.mManager.mDetector_map.values())
         detector_sets = dict()  # Keys are the new IDs and Values are the old detector values
         for idx in range(0, len(clustering)):
@@ -44,12 +46,13 @@ class LayerGenerator:
                 detector_sets.update(
                     {clustering[idx] + self.mNext_available_id: [detector_list[idx].mID]})
         print("Finished clustering layer")
-        self.graph(detector_sets)
+        # self.graph(detector_sets)
         # self.generate_new_detector_classifiers(detector_sets)
         self.generate_new_detector_means(detector_sets)
         return detector_sets
 
     def group_and_cluster(self):
+        # self.fuzzy_cluster()
         return self.cluster(self.group())
 
     def generate_new_detector_classifiers(self, detector_sets):
@@ -58,7 +61,7 @@ class LayerGenerator:
             temp_array = []
             for idx in detector_sets[idx_array]:
                 detector = self.mManager.mDetector_map[idx]
-                _, data, _ = detector.create_data()
+                _, data = detector.create_data()
                 temp_array.append(data[0:700])  # TEMP fix
             summed_data.append(temp_array)
         for data_group in summed_data:
@@ -76,7 +79,7 @@ class LayerGenerator:
             lower_level_detector_ids.append(detector_sets[idx_array])
             for idx in detector_sets[idx_array]:
                 detector = self.mManager.mDetector_map[idx]
-                _, data, _ = detector.create_data()
+                _, data = detector.create_data()
                 temp_array.append(data[0:700])
             meaned_data = np.mean(np.array(temp_array), axis=0)
             summed_data.append(meaned_data)
@@ -113,3 +116,12 @@ class LayerGenerator:
             idx += 1
         print("Finished creating new layer, " + str(layer_level))
         return layer, self.mNext_available_id
+
+    def fuzzy_cluster(self):
+        X = self.mManager.generate_detector_data_array()
+        scaler = preprocessing.StandardScaler().fit(X)
+        X_scaled = scaler.transform(X)
+        cntr, u, u0, d, jm, p, fpc = fuzz.cluster.cmeans(
+            X_scaled, c=3, m=2, error=0.005, maxiter=1000, init=None
+        )
+        return

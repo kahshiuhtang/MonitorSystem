@@ -1,8 +1,7 @@
+Methods to try:
 
-Fuzzy C-Means clustering
+Logistic Fitting?
 
-Issue with timestamp range
+Clustering and then detecting points of change between clusters
 
-Method of acquiring data after grouping
-
-Firings
+Removing outliers and then running TimeSeries

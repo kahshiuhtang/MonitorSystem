@@ -3,3 +3,5 @@ input/
 data/
 __pycache__/
 .vscode/
+pci-slowdown-data/
+test-pci/
