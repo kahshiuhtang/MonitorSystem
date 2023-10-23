@@ -206,7 +206,6 @@ class Detector:
         if saturation < 0.0001:
             return -1
         while saturation > 0.0001:
-            print(prev_rho)
             prev_rho = rho_test
             # [NOTE] What is a good learn percentage
             rho_test = rho_test - rho_test * 0.1
@@ -266,7 +265,7 @@ class Detector:
                 x_data, y_data, rho=default_rho, threshold_start=0.9)
         x_points = []
         y_points = []
-        # diss = []
+        diss = []
         for idx in range(1, len(x_data) - 1):
             left_arr = y_data[0:idx]
             right_arr = y_data[idx:]
@@ -274,23 +273,27 @@ class Detector:
             lambda_q = np.mean(right_arr)
             dissimilarity = self.squared_hellinger_distance(
                 lambda_p, lambda_q, rho)
-            # diss.append(dissimilarity)
             if dissimilarity > threshold:
                 x_points.append(x_data[idx])
                 y_points.append(y_data[idx])
-        # print(diss)
+                diss.append(dissimilarity)
+        print(diss)
         return x_points, y_points
 
-    def find_events_via_ts(self, x_data, y_data, rho_start=10, desired_threshold=0.02):
+    def find_events_via_ts(self, x_data, y_data, y_data_mean, rho_start=10, desired_threshold=0.02):
         default_rho = 10
+        interval_mean = np.mean(y_data)
         rho = self.find_valid_rho(x_data, y_data, rho_start)
         threshold = 0.9
+        y_data_max = np.max(y_data)
+        y_data_min = np.min(y_data)
         if rho < 0:
             rho = default_rho
             threshold = self.find_valid_threshold(
                 x_data, y_data, rho=default_rho, threshold_start=0.9, desired_threshold=desired_threshold)
         points = []
         point_diss = dict()
+        avg_diss = []
         for idx in range(1, len(x_data) - 1):
             left_arr = y_data[0:idx]
             right_arr = y_data[idx:]
@@ -298,20 +301,22 @@ class Detector:
             lambda_q = np.mean(right_arr)
             dissimilarity = self.squared_hellinger_distance(
                 lambda_p, lambda_q, rho)
+            avg_diss.append(dissimilarity)
             point_diss.update({idx: dissimilarity})
         ordered_diss = sorted(point_diss.items(),
                               key=lambda x: x[1], reverse=True)
-        ordered_diss = ordered_diss[:int(0.4*len(x_data))]
+        ordered_diss = ordered_diss[:int(0.035*len(x_data))]
+        uniq_points = []
         for tup in ordered_diss:
-            points.append([x_data[tup[0]], y_data[tup[0]]])
-        kmeans = KMeans(n_clusters=3, random_state=0,
-                        n_init="auto").fit(points)
-        return kmeans.cluster_centers_
+            points.append(
+                [x_data[tup[0]], y_data[tup[0]], interval_mean, y_data_mean, y_data_max, y_data_min])
+            uniq_points.append(tup[1])
+        return points
 
     def graph_events(self):
         x_data, y_data = self.create_data()
         event_points = self.find_events_via_ts(
-            x_data, y_data)
+            x_data, y_data, np.mean(y_data))
         plt.plot(x_data, y_data)
         for i in range(0, len(event_points)):
             plt.plot(event_points[i][0], event_points[i][1], marker="x", markersize=5,
@@ -346,3 +351,112 @@ class Detector:
         plt.title('Values over time for detector:' + str(self.mID))
         plt.show()
         return
+
+    def find_events_via_chunked_ts(self, x_data, y_data, rho_start=10, desired_threshold=0.02):
+        default_rho = 10
+        rho = self.find_valid_rho(x_data, y_data, rho_start)
+        threshold = 0.9
+        if rho < 0:
+            rho = default_rho
+            threshold = self.find_valid_threshold(
+                x_data, y_data, rho=default_rho, threshold_start=0.9, desired_threshold=desired_threshold)
+        points = []
+        point_diss = dict()
+        avg_diss = []
+        for idx in range(1, len(x_data) - 1):
+            left_arr = y_data[0:idx]
+            right_arr = y_data[idx:]
+            lambda_p = np.mean(left_arr)
+            lambda_q = np.mean(right_arr)
+            dissimilarity = self.squared_hellinger_distance(
+                lambda_p, lambda_q, rho)
+            avg_diss.append(dissimilarity)
+            point_diss.update({idx: dissimilarity})
+        ordered_diss = sorted(point_diss.items(),
+                              key=lambda x: x[1], reverse=True)
+        ordered_diss = ordered_diss[:int(0.4*len(x_data))]
+        avg_diss = np.mean(avg_diss)
+        std_diss = np.std(avg_diss)
+        for tup in ordered_diss:
+            if abs(avg_diss - tup[1]) / std_diss > 10:
+                points.append([x_data[tup[0]], 1])
+        if len(points) == 0:
+            return []
+        kmeans = KMeans(n_clusters=2, random_state=0,
+                        n_init="auto").fit(points)
+        return kmeans.cluster_centers_
+    # Maybe average diss should not be that similar to the largest diss?
+
+    def graph_events_by_chunks(self, chunks=5):
+        x_data, y_data = self.create_data()
+        chunk_size = int(len(x_data) / chunks)
+        y_mean = np.mean(y_data)
+        for i in range(0, chunks):
+            event_points = []
+            event_points = self.find_events_via_ts(
+                x_data[i*chunk_size:(i+1)*chunk_size], y_data[i*chunk_size:(i+1)*chunk_size], y_mean)
+            for j in range(0, len(event_points)):
+                plt.plot(event_points[j][0], event_points[j][1], marker="x", markersize=5,
+                         markeredgecolor="red", markerfacecolor="green")
+        plt.plot(x_data, y_data)
+        plt.xlabel('Timestamp')
+        plt.ylabel('Value')
+        plt.title('Values over time for detector:' + str(self.mID))
+        plt.show()
+        return
+
+    def overlapping_events(self, chunks=8):
+        x_data, y_data = self.create_data()
+        # Used to chunk each interval
+        whole_chunk_interval = int(len(x_data) / chunks)
+        # Used to increase the interval
+        small_chunk_interval = int(len(x_data) / (chunks*2-1))
+        y_mean = np.mean(y_data)
+        y_max = np.max(y_data)
+        y_min = np.min(y_data)
+        all_possible_events = []
+        for i in range(0, chunks*2 - 1):
+            event_points = self.find_events_via_ts(
+                x_data[i*small_chunk_interval:(i)*small_chunk_interval+whole_chunk_interval], y_data[i*small_chunk_interval:(i)*small_chunk_interval+whole_chunk_interval], y_mean)
+            for item in event_points:
+                all_possible_events.append(item)
+        event_points = self.filter_possible_event_points(
+            all_possible_events, y_max, y_min)
+        plt.plot(x_data, y_data)
+        for j in range(0, len(event_points)):
+            plt.plot(event_points[j][0], event_points[j][1], marker="x", markersize=5,
+                     markeredgecolor="red", markerfacecolor="green")
+        plt.xlabel('Timestamp')
+        plt.ylabel('Value')
+        plt.title('Values over time for detector:' + str(self.mID))
+        plt.show()
+        return
+    '''
+    Important points should occur in more than one interval
+    Important points will be in an interval that has great change
+    Important points should be in the middle of an interval, not toward the top or bottom 
+    '''
+
+    def filter_possible_event_points(self, poss_events, y_max, y_min):
+        events_by_x = dict()
+        for item in poss_events:
+            if item[0] in events_by_x.keys():
+                events_by_x[item[0]].append(item)
+            else:
+                events_by_x[item[0]] = [item]
+        ans = []
+        for val in events_by_x.values():
+            '''
+            Each val:
+            [0]: X-coord
+            [1]: Y-coord
+            [2]: Interval Mean
+            [3]: Y_data Mean
+            [4]: Y_data Max
+            [5]: Y_data Min
+            '''
+            for item in val:
+                if item[4] - item[5] > 0.5*y_max:
+                    ans.append([item[0], item[1]])
+        print(ans)
+        return ans

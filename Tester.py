@@ -239,7 +239,7 @@ def test_new_time_series(detector_id):
     # Check left edge to see if it is meaningful
 
 
-def event_detection(detector_id):
+def chunk_events(detector_id):
     hManager = HierarchalManager()
     files = []
 
@@ -252,7 +252,7 @@ def event_detection(detector_id):
                 file_name_path = os.path.join(root, file_name)
                 files.append("pci-slowdown-data/" + file_name)
     hManager.create_base_layer(files=files)
-    hManager.mLayers[0].mDetector_map[detector_id].graph_events()
+    hManager.mLayers[0].mDetector_map[detector_id].overlapping_events()
 
 
-event_detection(1)
+chunk_events(1)
