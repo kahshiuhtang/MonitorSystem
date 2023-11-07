@@ -249,8 +249,13 @@ class Detector:
             thresh_test = 0.9
         above_thresh = self.calculate_num_above_threshold(
             x_data, y_data, rho, thresh_test)
-        while above_thresh < desired_threshold:
-            thresh_test = thresh_test - 0.001 * thresh_test
+        flip_directions = 1
+        iterations = 0
+        while above_thresh < desired_threshold and iterations < 500:
+            iterations = iterations + 1
+            if above_thresh < 0.0000001:
+                flip_directions = -1
+            thresh_test = thresh_test - 0.001 * thresh_test * flip_directions
             above_thresh = self.calculate_num_above_threshold(
                 x_data, y_data, rho, thresh_test)
         return thresh_test
@@ -287,6 +292,8 @@ class Detector:
         threshold = 0.9
         y_data_max = np.max(y_data)
         y_data_min = np.min(y_data)
+        x_data_max = np.max(x_data)
+        x_data_min = np.min(x_data)  # Get caught in middle third is the goal
         if rho < 0:
             rho = default_rho
             threshold = self.find_valid_threshold(
@@ -309,7 +316,7 @@ class Detector:
         uniq_points = []
         for tup in ordered_diss:
             points.append(
-                [x_data[tup[0]], y_data[tup[0]], interval_mean, y_data_mean, y_data_max, y_data_min])
+                [x_data[tup[0]], y_data[tup[0]], interval_mean, y_data_mean, y_data_max, y_data_min, x_data_max, x_data_min])
             uniq_points.append(tup[1])
         return points
 
@@ -387,7 +394,7 @@ class Detector:
         return kmeans.cluster_centers_
     # Maybe average diss should not be that similar to the largest diss?
 
-    def graph_events_by_chunks(self, chunks=5):
+    def graph_events_by_chunks(self, chunks=36):
         x_data, y_data = self.create_data()
         chunk_size = int(len(x_data) / chunks)
         y_mean = np.mean(y_data)
@@ -405,13 +412,14 @@ class Detector:
         plt.show()
         return
 
-    def overlapping_events(self, chunks=8):
+    def find_unique_events(self, chunks=7):
         x_data, y_data = self.create_data()
         # Used to chunk each interval
         whole_chunk_interval = int(len(x_data) / chunks)
         # Used to increase the interval
         small_chunk_interval = int(len(x_data) / (chunks*2-1))
         y_mean = np.mean(y_data)
+        y_std = np.std(y_data)
         y_max = np.max(y_data)
         y_min = np.min(y_data)
         all_possible_events = []
@@ -420,43 +428,47 @@ class Detector:
                 x_data[i*small_chunk_interval:(i)*small_chunk_interval+whole_chunk_interval], y_data[i*small_chunk_interval:(i)*small_chunk_interval+whole_chunk_interval], y_mean)
             for item in event_points:
                 all_possible_events.append(item)
+        compartment_intervals = int(len(x_data) / 4) - 1
+        chunk_int = int(len(x_data) / compartment_intervals)
+        range_arr = dict()
+        for i in range(0, compartment_intervals):
+            range_arr[i] = [x_data[(i)*chunk_int], x_data[(i+1)*chunk_int]]
         event_points = self.filter_possible_event_points(
-            all_possible_events, y_max, y_min)
+            all_possible_events, y_max, y_min, range_arr)
         plt.plot(x_data, y_data)
         for j in range(0, len(event_points)):
             plt.plot(event_points[j][0], event_points[j][1], marker="x", markersize=5,
                      markeredgecolor="red", markerfacecolor="green")
         plt.xlabel('Timestamp')
         plt.ylabel('Value')
-        plt.title('Values over time for detector:' + str(self.mID))
+        plt.title('Detector:' + str(self.mID) + " Mean: " +
+                  str(round(y_mean, 2)) + " Std: "+str(round(y_std, 2)))
         plt.show()
         return
     '''
-    Important points should occur in more than one interval
+    Important points should occur in more than one interval -> Create boxes and try to see if more than one point is in box
     Important points will be in an interval that has great change
-    Important points should be in the middle of an interval, not toward the top or bottom 
     '''
 
-    def filter_possible_event_points(self, poss_events, y_max, y_min):
-        events_by_x = dict()
-        for item in poss_events:
-            if item[0] in events_by_x.keys():
-                events_by_x[item[0]].append(item)
-            else:
-                events_by_x[item[0]] = [item]
+    def filter_possible_event_points(self, poss_events, y_max, y_min, compartments):
+        num_in_compartment = dict()
+        item_id_to_compartment = dict()
+        for idx, item in enumerate(poss_events):
+            for key in compartments.keys():
+                if item[0] >= compartments[key][0] and item[0] < compartments[key][1]:
+                    if key in num_in_compartment.keys():
+                        num_in_compartment[key] = num_in_compartment[key] + 1
+                    else:
+                        num_in_compartment[key] = 1
+                    item_id_to_compartment[idx] = key
+                    break
         ans = []
-        for val in events_by_x.values():
-            '''
-            Each val:
-            [0]: X-coord
-            [1]: Y-coord
-            [2]: Interval Mean
-            [3]: Y_data Mean
-            [4]: Y_data Max
-            [5]: Y_data Min
-            '''
-            for item in val:
-                if item[4] - item[5] > 0.5*y_max:
-                    ans.append([item[0], item[1]])
-        print(ans)
+        for idx, item in enumerate(poss_events):
+            x_coord = item[0]
+            interval_y_max = item[4]
+            interval_y_min = item[5]
+            if interval_y_max - interval_y_min > 0.5*y_max:
+                compartment_id = item_id_to_compartment[idx]
+                if num_in_compartment[compartment_id] > 1:
+                    ans.append([x_coord, 0])
         return ans

@@ -252,7 +252,7 @@ def chunk_events(detector_id):
                 file_name_path = os.path.join(root, file_name)
                 files.append("pci-slowdown-data/" + file_name)
     hManager.create_base_layer(files=files)
-    hManager.mLayers[0].mDetector_map[detector_id].overlapping_events()
+    hManager.mLayers[0].mDetector_map[detector_id].find_unique_events()
 
 
-chunk_events(1)
+chunk_events(8)
