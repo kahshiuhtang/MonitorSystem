@@ -24,6 +24,7 @@ class Detector:
         self.mX_data = None
         self.mY_data = None
         self.mLowerLevelDetectorIDs = lower_level_detectors
+        self.mCurrent_Anomaly_Coords = []
 
     #
     def squared_hellinger_distance(self, lambda_p, lambda_q, rho):
@@ -412,8 +413,8 @@ class Detector:
         plt.show()
         return
 
-    def find_unique_events(self, chunks=7):
-        x_data, y_data = self.create_data()
+    def find_unique_events(self, chunks=8, index=0, target_ev=1):
+        x_data, y_data = self.test_get_data_before_interval(index)
         # Used to chunk each interval
         whole_chunk_interval = int(len(x_data) / chunks)
         # Used to increase the interval
@@ -423,18 +424,45 @@ class Detector:
         y_max = np.max(y_data)
         y_min = np.min(y_data)
         all_possible_events = []
-        for i in range(0, chunks*2 - 1):
-            event_points = self.find_events_via_ts(
-                x_data[i*small_chunk_interval:(i)*small_chunk_interval+whole_chunk_interval], y_data[i*small_chunk_interval:(i)*small_chunk_interval+whole_chunk_interval], y_mean)
-            for item in event_points:
-                all_possible_events.append(item)
-        compartment_intervals = int(len(x_data) / 4) - 1
-        chunk_int = int(len(x_data) / compartment_intervals)
-        range_arr = dict()
-        for i in range(0, compartment_intervals):
-            range_arr[i] = [x_data[(i)*chunk_int], x_data[(i+1)*chunk_int]]
-        event_points = self.filter_possible_event_points(
-            all_possible_events, y_max, y_min, range_arr)
+        target_events = target_ev
+        current_events = 0
+        event_points = []
+        best_events_score = 1000000
+        best_events_points = []
+        max_iterations = 10
+        current_iteration = 0
+        while target_events != current_events and current_iteration < max_iterations:
+            current_iteration = current_iteration + 1
+            whole_chunk_interval = int(len(x_data) / chunks)
+            # Used to increase the interval
+            small_chunk_interval = int(len(x_data) / (chunks*2-1))
+            for i in range(0, chunks*2 - 1):
+                event_points = self.find_events_via_ts(
+                    x_data[i*small_chunk_interval:(i)*small_chunk_interval+whole_chunk_interval], y_data[i*small_chunk_interval:(i)*small_chunk_interval+whole_chunk_interval], y_mean)
+                for item in event_points:
+                    all_possible_events.append(item)
+            compartment_intervals = int(len(x_data) / 4) - 1
+            chunk_int = int(len(x_data) / compartment_intervals)
+            range_arr = dict()
+            for i in range(0, compartment_intervals):
+                range_arr[i] = [x_data[(i)*chunk_int], x_data[(i+1)*chunk_int]]
+
+            event_points, ids = self.filter_possible_event_points(
+                all_possible_events, y_max, y_min, range_arr)
+            current_events = ids
+            print("chunks: " + str(chunks))
+            print("points: " + str(current_events))
+            print()
+            if abs(target_events - current_events) < abs(target_events - best_events_score):
+                best_events_points = event_points
+            if current_events > target_events:
+                chunks = chunks + 1
+            elif current_events < target_events:
+                chunks = chunks - 1
+            if chunks == 0:
+                break
+        if abs(target_events - current_events) > abs(target_events - best_events_score):
+            event_points = best_events_points
         plt.plot(x_data, y_data)
         for j in range(0, len(event_points)):
             plt.plot(event_points[j][0], event_points[j][1], marker="x", markersize=5,
@@ -463,12 +491,37 @@ class Detector:
                     item_id_to_compartment[idx] = key
                     break
         ans = []
+        ids = dict()
+        range_buffer = int(len(compartments) * 0.15)
         for idx, item in enumerate(poss_events):
             x_coord = item[0]
             interval_y_max = item[4]
             interval_y_min = item[5]
             if interval_y_max - interval_y_min > 0.5*y_max:
+                if len(item_id_to_compartment) == 0 and idx == 0:
+                    continue
                 compartment_id = item_id_to_compartment[idx]
                 if num_in_compartment[compartment_id] > 1:
-                    ans.append([x_coord, 0])
-        return ans
+                    valid = True
+                    for id in ids.keys():
+                        if compartment_id < id + range_buffer and compartment_id > id - range_buffer:
+                            valid = False
+                            ids[id].append(x_coord)
+                            break
+                    if valid == True:
+                        ans.append([x_coord, 0])
+                        ids.update(
+                            {compartment_id: [x_coord]})
+        new_ans = []
+        for id in ids.values():
+            mean = np.mean(np.array(id))
+            new_ans.append([mean, 0])
+        return new_ans, len(ids)
+
+    def test_get_data_before_interval(self, index):
+        x_data, y_data = self.create_data()
+        if index == 0:
+            return x_data, y_data
+        x_data = x_data[:index]
+        y_data = y_data[:index]
+        return x_data, y_data

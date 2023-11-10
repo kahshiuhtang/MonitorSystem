@@ -239,7 +239,7 @@ def test_new_time_series(detector_id):
     # Check left edge to see if it is meaningful
 
 
-def chunk_events(detector_id):
+def chunk_events(detector_id, interval_index=0, target=1):
     hManager = HierarchalManager()
     files = []
 
@@ -252,7 +252,8 @@ def chunk_events(detector_id):
                 file_name_path = os.path.join(root, file_name)
                 files.append("pci-slowdown-data/" + file_name)
     hManager.create_base_layer(files=files)
-    hManager.mLayers[0].mDetector_map[detector_id].find_unique_events()
+    hManager.mLayers[0].mDetector_map[detector_id].find_unique_events(
+        index=interval_index, target_ev=target)
 
 
-chunk_events(8)
+chunk_events(1, interval_index=800, target=3)

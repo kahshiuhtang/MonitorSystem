@@ -42,17 +42,47 @@ Distribution Change & Event Detection
     (A) You may need to adjust the CHUNKS parameter if you are not happy with the amount of points you get
     (B) I suspect this has to do with the data itself, but will check out if X-coords have anything to do with it
 
-Time diff, amount of data, data points, best chunk size
-1) 12, 450, 3, 16
-2) 6, 900, 1, 16
-3) 6, 900, 3, 16
-4) 6, 900, 2, 10
-5) 6, 900, 0, N/A
-6) 12, 450, 2, 7
-7) 6, 900, 2, 6
-8) 12, 450, 2, 16
-9) 6, 850, 2, 
-10) 6, 900, 0, N/A
-11)
-12)
-13)6, 900,2, 
+
+
+
+
+Plan:
+
+Finding ideal chunk size given a target amount of points:
+1) Start at a chunk size:
+2) Increase if we have too many points
+3) Decrease chunk size if we have too little points
+4) Stop at some max iterations of if we found the amount of points
+
+
+
+Finding events given stream of data
+Case 1: Sliding window
+- Keep track of how many events we have found
+- When an event goes out of frame, we decrease
+
+Case 2: Entire window
+- Keep track of how many events we have found
+- Keep looking for that next event
+
+Notes: 
+- Can work with one anomaly
+- When to know if you have more than one anomaly?
+    Shift window down?
+- Balance between the filtering and the point detection
+
+Given we have n events, we set the amount of events we are looking for to be n+1
+
+Issue:
+- How to find the best x_coord given multiple x_coords describing the event
+    How to define center of cluster? Mean?
+- What if there is no solution?
+    Too many or too little points
+- How to distinguish points 
+    - Knowing and finding 3 anomalies is different from not knowing and finding 3 anomalies
+    - Run this algorithm multiple times and look for consistency? 
+
+Best Plan:
+1) Always look for only one anomaly at a time
+2) Validate anomaly after a couple
+3) Find next anomaly
