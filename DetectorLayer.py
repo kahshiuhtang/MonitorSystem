@@ -30,7 +30,7 @@ class DetectorLayer:
         if loaded_data is not None:
             temp_detector.load_from_memory(interval, loaded_data)
         self.mDetector_map.update({detector_id: temp_detector})
-        if detector_id == 69:
+        if detector_id > 65:
             temp_detector.graph_data()
         return True
 
@@ -74,8 +74,8 @@ class DetectorLayer:
         counter = 0
         for id in ids:
             if id in self.mDetector_map:
-                x_data, y_data, anomaly_data = self.mDetector_map[id].create_data(x_range
-                                                                                  )
+                x_data, y_data = self.mDetector_map[id].create_data(x_range
+                                                                    )
                 plt.plot(x_data, y_data, c=self.MPL_COLORS[counter])
                 for anomaly in anomaly_data:
                     plt.plot(anomaly[0], anomaly[1], marker="x", markersize=5,
@@ -90,9 +90,11 @@ class DetectorLayer:
     def generate_detector_data_array(self):
         answer = []
         for detector in self.mDetector_map:
-            _, y_data, _ = self.mDetector_map[detector].create_data()
-            answer.append(y_data[:700])
-        return np.transpose(np.array(answer))
+            _, y_data = self.mDetector_map[detector].create_data()
+            # answer.append(y_data)
+            answer.append(y_data[:420])
+        return answer
+        # return np.transpose(np.array(answer))
 
     def save(self):
         for detector_id in self.mDetector_map:
