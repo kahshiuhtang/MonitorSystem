@@ -256,4 +256,24 @@ def chunk_events(detector_id, interval_index=0, target=1):
         index=interval_index, target_ev=target)
 
 
-chunk_events(1, interval_index=800, target=3)
+def stream_events(detector_id):
+    hManager = HierarchalManager()
+    files = []
+
+    path = r'pci-slowdown-data'
+    extension = '.csv'
+
+    for root, dirs_list, files_list in os.walk(path):
+        for file_name in files_list:
+            if os.path.splitext(file_name)[-1] == extension:
+                file_name_path = os.path.join(root, file_name)
+                files.append("pci-slowdown-data/" + file_name)
+    hManager.create_base_layer(files=files)
+    target = 1
+    for i in range(5, 16):
+        interval_index = i * 50
+        hManager.mLayers[0].mDetector_map[detector_id].find_unique_events(
+            right_index=interval_index, width=min(interval_index, 400), target_ev=target)
+
+
+stream_events(1)

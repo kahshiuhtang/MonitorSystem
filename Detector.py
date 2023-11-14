@@ -413,8 +413,8 @@ class Detector:
         plt.show()
         return
 
-    def find_unique_events(self, chunks=8, index=0, target_ev=1):
-        x_data, y_data = self.test_get_data_before_interval(index)
+    def find_unique_events(self, chunks=8, right_index=0, width=0, target_ev=1):
+        x_data, y_data = self.get_data_interval(right_index, width)
         # Used to chunk each interval
         whole_chunk_interval = int(len(x_data) / chunks)
         # Used to increase the interval
@@ -472,7 +472,7 @@ class Detector:
         plt.title('Detector:' + str(self.mID) + " Mean: " +
                   str(round(y_mean, 2)) + " Std: "+str(round(y_std, 2)))
         plt.show()
-        return
+        return current_events
     '''
     Important points should occur in more than one interval -> Create boxes and try to see if more than one point is in box
     Important points will be in an interval that has great change
@@ -493,12 +493,15 @@ class Detector:
         ans = []
         ids = dict()
         range_buffer = int(len(compartments) * 0.15)
+        print(item_id_to_compartment)
         for idx, item in enumerate(poss_events):
             x_coord = item[0]
             interval_y_max = item[4]
             interval_y_min = item[5]
             if interval_y_max - interval_y_min > 0.5*y_max:
                 if len(item_id_to_compartment) == 0 and idx == 0:
+                    continue
+                if idx not in item_id_to_compartment.keys():
                     continue
                 compartment_id = item_id_to_compartment[idx]
                 if num_in_compartment[compartment_id] > 1:
@@ -518,10 +521,10 @@ class Detector:
             new_ans.append([mean, 0])
         return new_ans, len(ids)
 
-    def test_get_data_before_interval(self, index):
+    def get_data_interval(self, index, width):
         x_data, y_data = self.create_data()
         if index == 0:
             return x_data, y_data
-        x_data = x_data[:index]
-        y_data = y_data[:index]
-        return x_data, y_data
+        if width == 0:
+            x_data[:index], y_data[:index]
+        return x_data[index-width: index], y_data[index-width: index]
