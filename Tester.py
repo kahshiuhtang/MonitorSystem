@@ -269,11 +269,11 @@ def stream_events(detector_id):
                 file_name_path = os.path.join(root, file_name)
                 files.append("pci-slowdown-data/" + file_name)
     hManager.create_base_layer(files=files)
-    target = 1
-    for i in range(5, 16):
+    target = 2
+    for i in range(1, 16):
         interval_index = i * 50
         hManager.mLayers[0].mDetector_map[detector_id].find_unique_events(
             right_index=interval_index, width=min(interval_index, 400), target_ev=target)
 
 
-stream_events(1)
+stream_events(8)

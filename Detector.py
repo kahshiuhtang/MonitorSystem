@@ -24,7 +24,7 @@ class Detector:
         self.mX_data = None
         self.mY_data = None
         self.mLowerLevelDetectorIDs = lower_level_detectors
-        self.mCurrent_Anomaly_Coords = []
+        self.mAnomalyCollection = []
 
     #
     def squared_hellinger_distance(self, lambda_p, lambda_q, rho):
@@ -428,6 +428,7 @@ class Detector:
         current_events = 0
         event_points = []
         best_events_score = 1000000
+        lowest_events_score = 1000000
         best_events_points = []
         max_iterations = 10
         current_iteration = 0
@@ -453,8 +454,10 @@ class Detector:
             print("chunks: " + str(chunks))
             print("points: " + str(current_events))
             print()
+            lowest_events_score = min(lowest_events_score, current_events)
             if abs(target_events - current_events) < abs(target_events - best_events_score):
                 best_events_points = event_points
+                best_events_score = current_events
             if current_events > target_events:
                 chunks = chunks + 1
             elif current_events < target_events:
@@ -463,7 +466,11 @@ class Detector:
                 break
         if abs(target_events - current_events) > abs(target_events - best_events_score):
             event_points = best_events_points
+        if target_events < best_events_score and len(event_points) != 2:
+            print("Clear event points")
+            event_points = []
         plt.plot(x_data, y_data)
+        self.add_points_to_collection(event_points)
         for j in range(0, len(event_points)):
             plt.plot(event_points[j][0], event_points[j][1], marker="x", markersize=5,
                      markeredgecolor="red", markerfacecolor="green")
@@ -521,10 +528,25 @@ class Detector:
             new_ans.append([mean, 0])
         return new_ans, len(ids)
 
+    def add_points_to_collection(self, points):
+        print(points)
+        print(self.mAnomalyCollection)
+        for point in points:
+            flagged = False
+            for x_val in self.mAnomalyCollection:
+                if abs(x_val - point[0]) / x_val < 0.05:
+                    flagged = True
+            if not flagged:
+                self.mAnomalyCollection.append(point[0])
+
     def get_data_interval(self, index, width):
         x_data, y_data = self.create_data()
         if index == 0:
             return x_data, y_data
+        if index > len(x_data):
+            print("Error: dataset too small")
         if width == 0:
             x_data[:index], y_data[:index]
+        if index - width < 0:
+            print("Error: dataset too small")
         return x_data[index-width: index], y_data[index-width: index]
