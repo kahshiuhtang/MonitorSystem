@@ -24,7 +24,7 @@ class Detector:
         self.mX_data = None
         self.mY_data = None
         self.mLowerLevelDetectorIDs = lower_level_detectors
-        self.mAnomalyCollection = []
+        self.mAnomalyCollection = dict()
 
     #
     def squared_hellinger_distance(self, lambda_p, lambda_q, rho):
@@ -415,6 +415,8 @@ class Detector:
 
     def find_unique_events(self, chunks=8, right_index=0, width=0, target_ev=1):
         x_data, y_data = self.get_data_interval(right_index, width)
+        if len(x_data) == 0 or len(y_data) == 0:
+            return []
         # Used to chunk each interval
         whole_chunk_interval = int(len(x_data) / chunks)
         # Used to increase the interval
@@ -451,9 +453,9 @@ class Detector:
             event_points, ids = self.filter_possible_event_points(
                 all_possible_events, y_max, y_min, range_arr)
             current_events = ids
-            print("chunks: " + str(chunks))
-            print("points: " + str(current_events))
-            print()
+            # print("chunks: " + str(chunks))
+            # print("points: " + str(current_events))
+            # print()
             lowest_events_score = min(lowest_events_score, current_events)
             if abs(target_events - current_events) < abs(target_events - best_events_score):
                 best_events_points = event_points
@@ -466,20 +468,25 @@ class Detector:
                 break
         if abs(target_events - current_events) > abs(target_events - best_events_score):
             event_points = best_events_points
-        if target_events < best_events_score and len(event_points) != 2:
-            print("Clear event points")
+        if target_events < best_events_score and len(event_points) > 2:
+            # print("Clear event points")
             event_points = []
-        plt.plot(x_data, y_data)
+        # plt.plot(x_data, y_data)
         self.add_points_to_collection(event_points)
-        for j in range(0, len(event_points)):
-            plt.plot(event_points[j][0], event_points[j][1], marker="x", markersize=5,
-                     markeredgecolor="red", markerfacecolor="green")
-        plt.xlabel('Timestamp')
-        plt.ylabel('Value')
-        plt.title('Detector:' + str(self.mID) + " Mean: " +
-                  str(round(y_mean, 2)) + " Std: "+str(round(y_std, 2)))
-        plt.show()
-        return current_events
+        x_min = np.min(x_data)
+        x_max = np.max(x_data)
+        keys = []
+        for key in self.mAnomalyCollection.keys():
+            if key > x_min and key < x_max and self.mAnomalyCollection[key] > 1:
+                # plt.plot(key, 0, marker="x", markersize=5,
+                # markeredgecolor="red", markerfacecolor="green")
+                keys.append(key)
+        # plt.xlabel('Timestamp')
+        # plt.ylabel('Value')
+        # plt.title('Detector:' + str(self.mID) + " Mean: " +
+                # str(round(y_mean, 2)) + " Std: "+str(round(y_std, 2)))
+        # plt.show()
+        return keys
     '''
     Important points should occur in more than one interval -> Create boxes and try to see if more than one point is in box
     Important points will be in an interval that has great change
@@ -500,7 +507,6 @@ class Detector:
         ans = []
         ids = dict()
         range_buffer = int(len(compartments) * 0.15)
-        print(item_id_to_compartment)
         for idx, item in enumerate(poss_events):
             x_coord = item[0]
             interval_y_max = item[4]
@@ -529,15 +535,17 @@ class Detector:
         return new_ans, len(ids)
 
     def add_points_to_collection(self, points):
-        print(points)
-        print(self.mAnomalyCollection)
         for point in points:
             flagged = False
-            for x_val in self.mAnomalyCollection:
-                if abs(x_val - point[0]) / x_val < 0.05:
+            for x_val in self.mAnomalyCollection.keys():
+                if abs(x_val - point[0]) < 120000 * 10:
                     flagged = True
+                    self.mAnomalyCollection[x_val
+                                            ] = self.mAnomalyCollection[x_val] + 1
             if not flagged:
-                self.mAnomalyCollection.append(point[0])
+                self.mAnomalyCollection[point[0]] = 1
+        print("Anomaly Collection")
+        print(self.mAnomalyCollection)
 
     def get_data_interval(self, index, width):
         x_data, y_data = self.create_data()
@@ -550,3 +558,7 @@ class Detector:
         if index - width < 0:
             print("Error: dataset too small")
         return x_data[index-width: index], y_data[index-width: index]
+
+    def get_used_data(self, right_index=0, width=0):
+        x_data, y_data = self.get_data_interval(right_index, width)
+        return x_data, y_data

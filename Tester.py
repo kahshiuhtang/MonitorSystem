@@ -3,6 +3,9 @@ from DetectorLayer import DetectorLayer
 from LayerGenerator import LayerGenerator
 from HierarchalManager import HierarchalManager
 import os
+import threading
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 def load_mult_detector_graph():
@@ -269,11 +272,92 @@ def stream_events(detector_id):
                 file_name_path = os.path.join(root, file_name)
                 files.append("pci-slowdown-data/" + file_name)
     hManager.create_base_layer(files=files)
-    target = 2
+    target = 1
     for i in range(1, 16):
         interval_index = i * 50
         hManager.mLayers[0].mDetector_map[detector_id].find_unique_events(
             right_index=interval_index, width=min(interval_index, 400), target_ev=target)
 
 
-stream_events(8)
+def threaded_function(detector, interval_index, target, result, lock):
+    ans = detector.find_unique_events(
+        right_index=interval_index, width=min(interval_index, 400), target_ev=target)
+    with lock:
+        result.update({detector.mID: ans})
+
+
+def multithreaded_stream(num_detectors, start_interval):
+    hManager = HierarchalManager()
+    files = []
+
+    path = r'pci-slowdown-data'
+    extension = '.csv'
+
+    for root, dirs_list, files_list in os.walk(path):
+        for file_name in files_list:
+            if os.path.splitext(file_name)[-1] == extension:
+                file_name_path = os.path.join(root, file_name)
+                files.append("pci-slowdown-data/" + file_name)
+    hManager.create_base_layer(files=files)
+    target = 1
+    for iteration in range(start_interval, 16):
+        result_queue = dict()
+        interval_index = iteration * 50
+        lock = threading.Lock()
+        threads = []
+        for i in range(num_detectors):
+            current_detector = hManager.mLayers[0].mDetector_map[i]
+            thread = threading.Thread(
+                target=threaded_function, args=(current_detector, interval_index, target, result_queue, lock))
+            threads.append(thread)
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        queue_counter = dict()
+        for anomalies in result_queue.values():
+            for val in anomalies:
+                if val in queue_counter.keys():
+                    queue_counter[val] = queue_counter[val] + 1
+                else:
+                    queue_counter[val] = 1
+        print(queue_counter)
+        for i in range(num_detectors):
+            current_detector = hManager.mLayers[0].mDetector_map[i]
+            interval_index = 50*(iteration - 2)
+            x_data, y_data = current_detector.get_used_data(
+                right_index=interval_index, width=min(interval_index, 400))
+            plt.subplot(4, 3, i+1)
+            plt.plot(x_data, y_data)
+            anomalies_found = []
+            if current_detector.mID in result_queue:
+                anomalies_found = result_queue[current_detector.mID]
+            if len(anomalies_found) > 0:
+                for anomaly in anomalies_found:
+                    count = queue_counter[anomaly]
+                    print(type(anomaly))
+                    for i in range(1, 5):  # Parameter, give small window of points
+                        if current_detector.mID == 3 or current_detector.mID == 1:
+                            print(str(float(anomaly) - 600000*i))
+                        if (float(anomaly) - 600000*i) in queue_counter:
+                            count = 2
+                            count += queue_counter[(float(anomaly) - 600000*i)]
+                    for i in range(1, 5):
+                        if (float(anomaly) + 600000*i) in queue_counter:
+                            count = 2
+                            count += queue_counter[(float(anomaly) + 600000*i)]
+                    if count > 1:
+                        if current_detector.mID == 3 or current_detector.mID == 1:
+                            print(anomaly)
+                        plt.plot(anomaly, np.mean(y_data), marker="x", markersize=5,
+                                 markeredgecolor="red", markerfacecolor="green")
+
+        plt.show()
+        print(result_queue)
+
+
+# {1683759600000.0: 7, 1683774000000.0: 2, 1683794460000.0: 3, 1683780060000.0: 1} #
+# {1683759600000.0: 7, 1683774600000.0: 2, 1683771330000.0: 1, 1683794460000.0: 3} # 8
+# stream_events(1)
+
+multithreaded_stream(12, 9)
