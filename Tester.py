@@ -300,6 +300,8 @@ def multithreaded_stream(num_detectors, start_interval):
                 files.append("pci-slowdown-data/" + file_name)
     hManager.create_base_layer(files=files)
     target = 1
+    print(hManager.mLayers[0].mDetector_map[0].mHistory)
+    return
     for iteration in range(start_interval, 16):
         result_queue = dict()
         interval_index = iteration * 50
@@ -354,10 +356,7 @@ def multithreaded_stream(num_detectors, start_interval):
 
         plt.show()
         print(result_queue)
-
-
-# {1683759600000.0: 7, 1683774000000.0: 2, 1683794460000.0: 3, 1683780060000.0: 1} #
-# {1683759600000.0: 7, 1683774600000.0: 2, 1683771330000.0: 1, 1683794460000.0: 3} # 8
 # stream_events(1)
+
 
 multithreaded_stream(12, 9)

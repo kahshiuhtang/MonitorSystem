@@ -147,6 +147,16 @@ class Detector:
         plt.title('Values over time for detector:' + str(self.mID))
         plt.show()
 
+    def graph(self):
+        x_data, y_data = self.create_data()
+        if (len(x_data)) == 0:
+            return
+        plt.plot(x_data, y_data)
+        plt.xlabel('Timestamp')
+        plt.ylabel('Value')
+        plt.title('Values over time for detector:' + str(self.mID))
+        plt.show()
+
     # Create the x,y and anomaly data for the .csv file
     def create_data(self, x_range=None):
         if self.mX_data is not None and self.mY_data is not None:
@@ -167,7 +177,7 @@ class Detector:
 
     def load_from_memory(self, timestamps, data):
         for i in range(0, len(data)):
-            self.mHistory.update({timestamps[i]: (data[i])})
+            self.mHistory.update({timestamps[i]: [data[i]]})
         return
 
     # Only graph the 0,1's of the anomaly values
