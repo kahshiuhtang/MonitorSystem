@@ -6,7 +6,6 @@ from Detector import Detector
 from DetectorLayer import DetectorLayer
 from LayerGenerator import LayerGenerator
 from HierarchalManager import HierarchalManager
-import os
 """
 Time Per Epoch: epoch_time{instance=~"${ml_job}"}
 System CPU Usage: (1 - avg(rate(node_cpu_seconds_total{mode="idle", instance=~"${node}"}[1m])))*100
@@ -152,7 +151,7 @@ class Runner:
             timestamps.append(data[i][0])
             data1.append(data[i][tup_len - 1])
         detector.load_from_memory(timestamps, data1)
-        # detector.graph()
+        detector.graph()
         return detector
 
     def load_from_database(self, table, constraints):
@@ -165,10 +164,6 @@ class Runner:
             self.cursor.execute(
                 """SELECT timestamp_col, value_col FROM {} WHERE realtime_col >= NOW() - INTERVAL '12 hours' AND instance = '{}' ORDER BY timestamp_col ASC;""".format(table, str(constraints[0])))
         results = self.cursor.fetchall()
-        # print("=== === ===")
-        # for row in results:
-        #    print(row)
-        # print()
         return results
 
     def run(self):

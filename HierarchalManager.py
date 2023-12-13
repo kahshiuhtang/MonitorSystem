@@ -39,7 +39,7 @@ class HierarchalManager:
                              1].mDetector_map.update({detector.mID: detector})
         return
 
-    def create_base_layer(self, path=None, files=None):
+    def create_base_layer(self, path=None, files=None, detectors=None):
         if path is not None:
             starting_layer = DetectorLayer(1)
             directory = os.path.join("c:\\", "path")
@@ -62,9 +62,16 @@ class HierarchalManager:
             self.mLayers.append(starting_layer)
             self.mNext_available_id += 1
             return True
+        elif detectors is not None:
+            starting_layer = DetectorLayer(1)
+            for detector in detectors:
+                starting_layer.add_detect(detector=detector)
+            self.mLayers.append(starting_layer)
+            self.mNext_available_id += 1
         else:
             print("[Error]: No data")
             return False
+        print("Successfully loaded first layer of data.")
         return
 
     def create_higher_level_layers(self):

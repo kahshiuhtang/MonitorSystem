@@ -2,6 +2,7 @@ from Detector import Detector
 from DetectorLayer import DetectorLayer
 from LayerGenerator import LayerGenerator
 from HierarchalManager import HierarchalManager
+from runner import Runner
 import os
 import threading
 import matplotlib.pyplot as plt
@@ -120,40 +121,6 @@ def run_graph():
         hManager.mLayers[0].mDetector_map[i].graph_data()
 
 
-def tester_std1():
-    hManager = HierarchalManager()
-    files = []
-
-    path = r'pci-slowdown-data'
-    extension = '.csv'
-
-    for root, dirs_list, files_list in os.walk(path):
-        for file_name in files_list:
-            if os.path.splitext(file_name)[-1] == extension:
-                file_name_path = os.path.join(root, file_name)
-                files.append("pci-slowdown-data/" + file_name)
-    hManager.create_base_layer(files=files)
-    for i in range(0, 5):
-        hManager.mLayers[0].mDetector_map[1].graph_data(
-            method="ts", contam=0.005*(i+1))
-
-
-def tester_std(rho):
-    hManager = HierarchalManager()
-    files = []
-    path = r'pci-slowdown-data'
-    extension = '.csv'
-
-    for root, dirs_list, files_list in os.walk(path):
-        for file_name in files_list:
-            if os.path.splitext(file_name)[-1] == extension:
-                file_name_path = os.path.join(root, file_name)
-                files.append("pci-slowdown-data/" + file_name)
-    hManager.create_base_layer(files=files)
-    hManager.mLayers[0].mDetector_map[1].graph_data(
-        method="ts", rho=rho)
-
-
 def tune_rho(detector_id):
     hManager = HierarchalManager()
     files = []
@@ -189,25 +156,8 @@ def tune_rho(detector_id):
             print("-----------------")
             break
         it += 1
-    # load_mult_detector_graph()
-
-# load_single_detector_graph()
-
-# load_single_detector_graph_anomaly([1300, 1400])
-
-# load_single_detector_find_anomalies()
-
-# rho_estimation(1.5)
 
 
-# load_mult_detector_group_and_cluster()
-# load_mult_detector_group_create_layer()
-# data_length()
-
-# run_graph()  # Contam would be different if not all send data at same point
-# tester_iso_forest()
-# tester_std(rho=3.010027210823807e-8)
-# tune_rho(1)
 def tester_std(rho):
     hManager = HierarchalManager()
     files = []
@@ -282,40 +232,43 @@ def stream_events(detector_id):
 def threaded_function(detector, interval_index, target, result, lock):
     ans = detector.find_unique_events(
         right_index=interval_index, width=min(interval_index, 400), target_ev=target)
+    print("[threaded_function]: Waiting for lock.")
     with lock:
         result.update({detector.mID: ans})
+        print("[threaded_function]: Releasing lock.")
 
 
 def multithreaded_stream(num_detectors, start_interval):
+    """
+    Pull the data from the database that we run the ALGO on
+    """
     hManager = HierarchalManager()
-    files = []
-
-    path = r'pci-slowdown-data'
-    extension = '.csv'
-
-    for root, dirs_list, files_list in os.walk(path):
-        for file_name in files_list:
-            if os.path.splitext(file_name)[-1] == extension:
-                file_name_path = os.path.join(root, file_name)
-                files.append("pci-slowdown-data/" + file_name)
-    hManager.create_base_layer(files=files)
-    target = 1
-    print(hManager.mLayers[0].mDetector_map[0].mHistory)
-    return
+    runner = Runner()
+    detectors = runner.pull()
+    hManager.create_base_layer(detectors=detectors)
+    TARGET = 1
+    """
+    For every non-overlapping chunk, we want to create a thread that finds the 
+    """
     for iteration in range(start_interval, 16):
         result_queue = dict()
-        interval_index = iteration * 50
+        STARTING_INTERVAL_INDEX = iteration * 50
         lock = threading.Lock()
         threads = []
         for i in range(num_detectors):
-            current_detector = hManager.mLayers[0].mDetector_map[i]
+            current_detector = hManager.mLayers[0].mDetector_map[11]
             thread = threading.Thread(
-                target=threaded_function, args=(current_detector, interval_index, target, result_queue, lock))
+                target=threaded_function, args=(current_detector, STARTING_INTERVAL_INDEX, TARGET, result_queue, lock))
             threads.append(thread)
         for thread in threads:
+            print("Starting Thread")
             thread.start()
         for thread in threads:
+            print("Ending Thread")
             thread.join()
+        """
+        Count how often every anomaly shows up
+        """
         queue_counter = dict()
         for anomalies in result_queue.values():
             for val in anomalies:
@@ -323,7 +276,10 @@ def multithreaded_stream(num_detectors, start_interval):
                     queue_counter[val] = queue_counter[val] + 1
                 else:
                     queue_counter[val] = 1
-        print(queue_counter)
+        print("[multithreaded_stream]:" + queue_counter)
+        """
+        For every detector, we want to plot it and the interval it just searched
+        """
         for i in range(num_detectors):
             current_detector = hManager.mLayers[0].mDetector_map[i]
             interval_index = 50*(iteration - 2)
@@ -355,8 +311,7 @@ def multithreaded_stream(num_detectors, start_interval):
                                  markeredgecolor="red", markerfacecolor="green")
 
         plt.show()
-        print(result_queue)
-# stream_events(1)
+        print("[multithreaded-stream]: " + result_queue)
 
 
-multithreaded_stream(12, 9)
+multithreaded_stream(6, 0)
