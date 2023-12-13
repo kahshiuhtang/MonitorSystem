@@ -28,15 +28,14 @@ class LayerGenerator:
         X = self.mManager.generate_detector_data_array()
         scaler = preprocessing.StandardScaler().fit(X)
         X_scaled = scaler.transform(X)
-        cov = GraphicalLasso(alpha=1, tol=0.0001,
+        cov = GraphicalLasso(alpha=0.1,
                              max_iter=4500).fit(X_scaled)
         print("Finished grouping layer")
         return np.around(cov.covariance_, decimals=3)
 
     def cluster(self, X):
         clustering = AffinityPropagation(random_state=5).fit_predict(X)
-        exit()
-        detector_list = list(self.mManager.mDetector_map.values())
+        detector_list = list(self.mManager.mDetector_map.values())  # IDS
         detector_sets = dict()  # Keys are the new IDs and Values are the old detector values
         for idx in range(0, len(clustering)):
             if clustering[idx] + self.mNext_available_id in detector_sets:
@@ -46,13 +45,10 @@ class LayerGenerator:
                 detector_sets.update(
                     {clustering[idx] + self.mNext_available_id: [detector_list[idx].mID]})
         print("Finished clustering layer")
-        # self.graph(detector_sets)
-        # self.generate_new_detector_classifiers(detector_sets)
         self.generate_new_detector_means(detector_sets)
         return detector_sets
 
     def group_and_cluster(self):
-        # self.fuzzy_cluster()
         return self.cluster(self.group())
 
     def generate_new_detector_classifiers(self, detector_sets):

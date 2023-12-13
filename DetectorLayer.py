@@ -34,6 +34,10 @@ class DetectorLayer:
             temp_detector.graph_data()
         return True
 
+    def add_detect(self, detector):
+        self.mDetector_map.update({detector.mID: detector})
+        return True
+
     # Remove one specific detector based on ID
     # Returns TRUE if detector was found, otherwise FALSE
     def delete_detector(self, id):
@@ -91,10 +95,8 @@ class DetectorLayer:
         answer = []
         for detector in self.mDetector_map:
             _, y_data = self.mDetector_map[detector].create_data()
-            # answer.append(y_data)
-            answer.append(y_data[:420])
-        return answer
-        # return np.transpose(np.array(answer))
+            answer.append(y_data[:800])
+        return np.transpose(answer)
 
     def save(self):
         for detector_id in self.mDetector_map:

@@ -154,7 +154,8 @@ class Detector:
         plt.plot(x_data, y_data)
         plt.xlabel('Timestamp')
         plt.ylabel('Value')
-        plt.title('Values over time for detector:' + str(self.mID))
+        plt.title('Values over time for detector:' +
+                  str(self.mID) + "," + str(self.mName))
         plt.show()
 
     # Create the x,y and anomaly data for the .csv file
