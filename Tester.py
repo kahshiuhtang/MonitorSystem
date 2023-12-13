@@ -276,7 +276,8 @@ def multithreaded_stream(num_detectors, start_interval):
                     queue_counter[val] = queue_counter[val] + 1
                 else:
                     queue_counter[val] = 1
-        print("[multithreaded_stream]:" + queue_counter)
+        print("[multithreaded_stream]:")
+        print(queue_counter)
         """
         For every detector, we want to plot it and the interval it just searched
         """
@@ -293,7 +294,6 @@ def multithreaded_stream(num_detectors, start_interval):
             if len(anomalies_found) > 0:
                 for anomaly in anomalies_found:
                     count = queue_counter[anomaly]
-                    print(type(anomaly))
                     for i in range(1, 5):  # Parameter, give small window of points
                         if current_detector.mID == 3 or current_detector.mID == 1:
                             print(str(float(anomaly) - 600000*i))
@@ -311,7 +311,8 @@ def multithreaded_stream(num_detectors, start_interval):
                                  markeredgecolor="red", markerfacecolor="green")
 
         plt.show()
-        print("[multithreaded-stream]: " + result_queue)
+        print("[multithreaded-stream]: ")
+        print(result_queue)
 
 
 multithreaded_stream(6, 0)

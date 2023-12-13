@@ -151,7 +151,7 @@ class Runner:
             timestamps.append(data[i][0])
             data1.append(data[i][tup_len - 1])
         detector.load_from_memory(timestamps, data1)
-        detector.graph()
+        # detector.graph()
         return detector
 
     def load_from_database(self, table, constraints):

@@ -348,65 +348,68 @@ class Detector:
 
     def find_unique_events(self, chunks=8, right_index=0, width=0, target_ev=1):
         x_data, y_data = self.get_data_interval(right_index, width)
+        X_DATA_LEN = len(x_data)
+        Y_DATA_LEN = len(y_data)
         if len(x_data) == 0 or len(y_data) == 0:
             return []
         print("[find_unique_events]: Acquired Data")
         # Used to chunk each interval
         WHOLE_CHUNK_INTERVAL = int(len(x_data) / chunks)
         # Used to increase the interval
-        small_chunk_interval = int(len(x_data) / (chunks*2-1))
+        SMALL_CHUNK_INTERVAL = int(len(x_data) / (chunks*2-1))
         y_mean = np.mean(y_data)
-        y_std = np.std(y_data)
         y_max = np.max(y_data)
         y_min = np.min(y_data)
-        all_possible_events = []
-        target_events = target_ev
         current_events = 0
-        event_points = []
+        potential_event_points = []
+        filtered_event_points = []
         best_events_score = 1000000
-        lowest_events_score = 1000000
         best_events_points = []
-        max_iterations = 10
+        lowest_events_score = 1000000
+        MAX_ITERATIONS = 10
         current_iteration = 0
         print("Setting up constants")
         print("Looping through intervals")
-        while target_events != current_events and current_iteration < max_iterations:
+        while target_ev != current_events and current_iteration < MAX_ITERATIONS:
             # print("Iteration: " + str(current_iteration))
             current_iteration = current_iteration + 1
-            WHOLE_CHUNK_INTERVAL = int(len(x_data) / chunks)
+            # Used to chunk each interval
+            WHOLE_CHUNK_INTERVAL = int(X_DATA_LEN / chunks)
             # Used to increase the interval
-            small_chunk_interval = int(len(x_data) / (chunks*2-1))
-            # print("Trying to find events in chunks")
+            SMALL_CHUNK_INTERVAL = int(X_DATA_LEN / (chunks*2-1))
+            """
+            For every chunk, we try to find events in the chunk
+            """
             for i in range(0, chunks*2 - 1):
                 # print("Looking in chunk " + str(i))
-                event_points = self.find_events_via_ts(
-                    x_data[i*small_chunk_interval:(i)*small_chunk_interval+WHOLE_CHUNK_INTERVAL], y_data[i*small_chunk_interval:(i)*small_chunk_interval+whole_chunk_interval], y_mean)
-                for item in event_points:
-                    all_possible_events.append(item)
-            compartment_intervals = int(len(x_data) / 4) - 1
-            chunk_int = int(len(x_data) / compartment_intervals)
+                events = self.find_events_via_ts(
+                    x_data[i*SMALL_CHUNK_INTERVAL:(i)*SMALL_CHUNK_INTERVAL+WHOLE_CHUNK_INTERVAL], y_data[i*SMALL_CHUNK_INTERVAL:(i)*SMALL_CHUNK_INTERVAL+WHOLE_CHUNK_INTERVAL], y_mean)
+                for item in events:
+                    potential_event_points.append(item)
+            compartment_intervals = int(X_DATA_LEN / 4) - 1
+            chunk_int = int(X_DATA_LEN / compartment_intervals)
             range_arr = dict()
             for i in range(0, compartment_intervals):
                 range_arr[i] = [x_data[(i)*chunk_int], x_data[(i+1)*chunk_int]]
 
-            event_points, ids = self.filter_possible_event_points(
-                all_possible_events, y_max, y_min, range_arr)
+            filtered_event_points, ids = self.filter_possible_event_points(
+                potential_event_points, y_max, y_min, range_arr)
             current_events = ids
             lowest_events_score = min(lowest_events_score, current_events)
-            if abs(target_events - current_events) < abs(target_events - best_events_score):
-                best_events_points = event_points
+            if abs(target_ev - current_events) < abs(target_ev - best_events_score):
+                best_events_points = filtered_event_points
                 best_events_score = current_events
-            if current_events > target_events:
+            if current_events > target_ev:
                 chunks = chunks + 1
-            elif current_events < target_events:
+            elif current_events < target_ev:
                 chunks = chunks - 1
             if chunks == 0:
                 break
-        if abs(target_events - current_events) > abs(target_events - best_events_score):
-            event_points = best_events_points
-        if target_events < best_events_score and len(event_points) > 2:
-            event_points = []
-        self.add_points_to_collection(event_points)
+        if abs(target_ev - current_events) > abs(target_ev - best_events_score):
+            filtered_event_points = best_events_points
+        if target_ev < best_events_score and len(filtered_event_points) > 2:
+            filtered_event_points = []
+        self.add_points_to_collection(filtered_event_points)
         x_min = np.min(x_data)
         x_max = np.max(x_data)
         keys = []
@@ -419,9 +422,13 @@ class Detector:
     Important points will be in an interval that has great change
     '''
 
-    def filter_possible_event_points(self, poss_events, y_max, y_min, compartments):
+    def filter_possible_event_points(self, poss_events, y_max, y_min, compartments, BUFFER=0.15):
         num_in_compartment = dict()
         item_id_to_compartment = dict()
+        """
+        Going through all possible events, trying to put the event into the compartment it was found
+        Keep track of how many events were found in each compartment
+        """
         for idx, item in enumerate(poss_events):
             for key in compartments.keys():
                 if item[0] >= compartments[key][0] and item[0] < compartments[key][1]:
@@ -431,35 +438,47 @@ class Detector:
                         num_in_compartment[key] = 1
                     item_id_to_compartment[idx] = key
                     break
-        ans = []
-        ids = dict()
-        range_buffer = int(len(compartments) * 0.15)
+        found_event_groups = dict()
+        RANGE_BUFFER = int(len(compartments) * BUFFER)
+        """
+        For all possible events, try to find if it is significant
+        """
         for idx, item in enumerate(poss_events):
             x_coord = item[0]
             interval_y_max = item[4]
             interval_y_min = item[5]
-            if interval_y_max - interval_y_min > 0.5*y_max:
+            if interval_y_max - interval_y_min > 0.5*y_max:  # See if there was enough fluctuation in the interval
+                # If there were no points in compartment, no need to continue looking
                 if len(item_id_to_compartment) == 0 and idx == 0:
                     continue
-                if idx not in item_id_to_compartment.keys():
+                if idx not in item_id_to_compartment.keys():  # Check to avoid key errors
                     continue
                 compartment_id = item_id_to_compartment[idx]
+                """
+                We want to group nearby points into this one event so one event doesn't show up
+                in as different events due to slight change in timestamp
+                """
                 if num_in_compartment[compartment_id] > 1:
-                    valid = True
-                    for id in ids.keys():
-                        if compartment_id < id + range_buffer and compartment_id > id - range_buffer:
-                            valid = False
-                            ids[id].append(x_coord)
+                    event_has_not_been_found = True
+                    for id in found_event_groups.keys():
+                        """
+                        See if this event has been spotted before
+                        """
+                        if compartment_id < id + RANGE_BUFFER and compartment_id > id - RANGE_BUFFER:
+                            event_has_not_been_found = False
+                            found_event_groups[id].append(x_coord)
                             break
-                    if valid == True:
-                        ans.append([x_coord, 0])
-                        ids.update(
+                    if event_has_not_been_found == True:
+                        found_event_groups.update(
                             {compartment_id: [x_coord]})
-        new_ans = []
-        for id in ids.values():
+        combined_event_points = []
+        """
+        Want to turn those nearby event points into one event point x-coordinate
+        """
+        for id in found_event_groups.values():
             mean = np.mean(np.array(id))
-            new_ans.append([mean, 0])
-        return new_ans, len(ids)
+            combined_event_points.append([mean, 0])
+        return combined_event_points, len(found_event_groups)
 
     def add_points_to_collection(self, points):
         for point in points:
