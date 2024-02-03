@@ -29,13 +29,11 @@ class DetectorLayer:
             temp_detector.load_from_file(file_name)
         if loaded_data is not None:
             temp_detector.load_from_memory(interval, loaded_data)
-        self.mDetector_map.update({detector_id: temp_detector})
-        if detector_id > 65:
-            temp_detector.graph_data()
+        self.mDetector_map.update({int(detector_id): temp_detector})
         return True
 
     def add_detect(self, detector):
-        self.mDetector_map.update({detector.mID: detector})
+        self.mDetector_map[str(detector.mID)] = detector
         return True
 
     # Remove one specific detector based on ID

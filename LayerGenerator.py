@@ -25,6 +25,7 @@ class LayerGenerator:
         return ans
 
     def group(self):
+        print(self.mManager.mDetector_map)
         X = self.mManager.generate_detector_data_array()
         scaler = preprocessing.StandardScaler().fit(X)
         X_scaled = scaler.transform(X)
@@ -37,7 +38,8 @@ class LayerGenerator:
         clustering = AffinityPropagation(random_state=5).fit_predict(X)
         detector_list = list(self.mManager.mDetector_map.values())  # IDS
         detector_sets = dict()  # Keys are the new IDs and Values are the old detector values
-        for idx in range(0, len(clustering)):
+        print(clustering)
+        for idx in range(len(clustering)):
             if clustering[idx] + self.mNext_available_id in detector_sets:
                 detector_sets[clustering[idx] + self.mNext_available_id].append(
                     detector_list[idx].mID)
@@ -68,17 +70,18 @@ class LayerGenerator:
 
     def generate_new_detector_means(self, detector_sets):
         print("Started summing detector means for higher-level detectors")
+        print(detector_sets)
         summed_data = []
         lower_level_detector_ids = []
-        for idx_array in detector_sets:
+        for cluster in detector_sets:
             temp_array = []
-            lower_level_detector_ids.append(detector_sets[idx_array])
-            for idx in detector_sets[idx_array]:
-                detector = self.mManager.mDetector_map[idx]
+            lower_level_detector_ids.append(detector_sets[cluster])
+            for detectorID in detector_sets[cluster]:
+                detector = self.mManager.mDetector_map[str(detectorID)]
                 _, data = detector.create_data()
                 temp_array.append(data[0:700])
-            meaned_data = np.mean(np.array(temp_array), axis=0)
-            summed_data.append(meaned_data)
+            mean_data = np.mean(np.array(temp_array), axis=0)
+            summed_data.append(mean_data)
         print("Finished summing detector means for higher-level detectors")
         return summed_data, lower_level_detector_ids
 

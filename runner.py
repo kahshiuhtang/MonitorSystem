@@ -72,7 +72,7 @@ class Runner:
         self.conn.commit()
 
     def pull_metrics(self, query_url, query, time, isGPU):
-        time = "[12h]"
+        time = "[3h]"
         query_url = f'{query_url}/api/v1/query?query={query}{time}'
         print(query_url)
         res = requests.get(query_url)
@@ -131,18 +131,18 @@ class Runner:
     def find_all_unique(self,  table, column_name):
         if len(column_name) == 2:
             self.cursor.execute(
-                """SELECT DISTINCT {}, {} FROM  {} WHERE realtime_col >= NOW() - INTERVAL '12 hours' ORDER BY {}, {};""".format(column_name[0], column_name[1], table, column_name[0], column_name[1]))
+                """SELECT DISTINCT {}, {} FROM  {} WHERE realtime_col >= NOW() - INTERVAL '200 days' ORDER BY {}, {};""".format(column_name[0], column_name[1], table, column_name[0], column_name[1]))
             results = self.cursor.fetchall()
         else:
             self.cursor.execute(
-                """SELECT DISTINCT {} FROM  {} WHERE realtime_col >= NOW() - INTERVAL '12 hours';""".format(column_name[0], table))
+                """SELECT DISTINCT {} FROM  {} WHERE realtime_col >= NOW() - INTERVAL '200 days';""".format(column_name[0], table))
             results = self.cursor.fetchall()
         return results
 
-    def load_into_detector(self, data, dID, dLevel, name):
+    def load_into_detector(self, data, dID, dLevel, name, instance=None, gpu=None):
         if data is None or len(data) == 0:
             return
-        detector = Detector(dID, "", dLevel, [])
+        detector = Detector(dID, "", dLevel, [], instance=instance, gpu=gpu)
         detector.mName = name
         timestamps = []
         data1 = []
@@ -151,7 +151,6 @@ class Runner:
             timestamps.append(data[i][0])
             data1.append(data[i][tup_len - 1])
         detector.load_from_memory(timestamps, data1)
-        # detector.graph()
         return detector
 
     def load_from_database(self, table, constraints):
@@ -159,10 +158,10 @@ class Runner:
             return
         if len(constraints) == 2:
             self.cursor.execute(
-                """SELECT timestamp_col, value_col FROM {} WHERE realtime_col >= NOW() - INTERVAL '12 hours' AND gpu = '{}' AND instance = '{}' ORDER BY timestamp_col ASC;""".format(table, constraints[0], constraints[1]))
+                """SELECT timestamp_col, value_col FROM {} WHERE realtime_col >= NOW() - INTERVAL '200 days' AND gpu = '{}' AND instance = '{}' ORDER BY timestamp_col ASC;""".format(table, constraints[0], constraints[1]))
         else:
             self.cursor.execute(
-                """SELECT timestamp_col, value_col FROM {} WHERE realtime_col >= NOW() - INTERVAL '12 hours' AND instance = '{}' ORDER BY timestamp_col ASC;""".format(table, str(constraints[0])))
+                """SELECT timestamp_col, value_col FROM {} WHERE realtime_col >= NOW() - INTERVAL '200 days' AND instance = '{}' ORDER BY timestamp_col ASC;""".format(table, str(constraints[0])))
         results = self.cursor.fetchall()
         return results
 
@@ -178,7 +177,7 @@ class Runner:
             self.store_metrics(query["db_name"],
                                value_names, value_types, data)
 
-    def pull(self):
+    def pull(self, instance="130.245.176.67:9400", gpu="1"):
         total_count = 0
         layer = 1
         detectors = []
@@ -188,21 +187,28 @@ class Runner:
                     "gpu", "instance"])
                 for pair in unique_pairs:
                     data = self.load_from_database(query["db_name"], pair)
-                    detectors.append(self.load_into_detector(
-                        data, total_count, layer, query["db_name"] + pair[0] + pair[1]))
+                    detect = self.load_into_detector(
+                        data, total_count, layer, query["db_name"], instance=pair[1], gpu=pair[0])
+                    # if instance == pair[1] and gpu == pair[0]:
+                    detectors.append(detect)
                     total_count += 1
+                    detect.graph()
             else:
                 unique_pairs = self.find_all_unique(query["db_name"], [
                     "instance"])
                 for pair in unique_pairs:
                     data = self.load_from_database(query["db_name"], pair)
-                    detectors.append(self.load_into_detector(
-                        data, total_count, layer, query["db_name"] + pair[0]))
+                    detect = self.load_into_detector(
+                        data, total_count, layer, query["db_name"], instance=pair[0])
+                    # if instance == pair[0]:
+                    detectors.append(detect)
                     total_count += 1
+                    detect.graph()
         return detectors
 
     def pipeline(self):
-        # run(cursor, conn, queries)
+        # self.clear_database()
+        # self.run()
         det = self.pull()
         # self.run_cluster(det)
         self.shutdown()

@@ -12,7 +12,7 @@ from sklearn.cluster import KMeans
 
 
 class Detector:
-    def __init__(self, id, detector_type, detector_level, lower_level_detectors):
+    def __init__(self, id, detector_type, detector_level, lower_level_detectors, instance="", gpu=""):
         self.mName = ""
         self.mID = id
         self.mHistory = dict()
@@ -25,6 +25,10 @@ class Detector:
         self.mY_data = None
         self.mLowerLevelDetectorIDs = lower_level_detectors
         self.mAnomalyCollection = dict()
+        self.mInstance = instance
+        self.mGPU = gpu
+        if gpu == None:
+            self.mGPU = ""
 
     def run_isolation_forest(self, x_data, y_data, method="i-forest", contamination=0.05):
         if method == "i-forest":
@@ -146,11 +150,14 @@ class Detector:
         x_data, y_data = self.create_data()
         if (len(x_data)) == 0:
             return
+        plt.figure(figsize=(10, 5))
         plt.plot(x_data, y_data)
+        # plt.xlim(xmin=1703023686)
+        # plt.xlim(xmax=1703024456)
         plt.xlabel('Timestamp')
         plt.ylabel('Value')
-        plt.title('Values over time for detector:' +
-                  str(self.mID) + "," + str(self.mName))
+        plt.title(self.mName + ' Instance: ' + str(self.mInstance) +
+                  ' Detector GPU: ' + str(self.mGPU))
         plt.show()
 
     # Create the x,y and anomaly data for the .csv file
@@ -191,35 +198,40 @@ class Detector:
     def squared_hellinger_distance(self, lambda_p, lambda_q, rho):
         return 1 - math.e ** (-rho * ((math.sqrt(lambda_p) - math.sqrt(lambda_q)) ** 2) / 2)
 
-    def find_valid_rho(self, x_data, y_data, starting_rho=10):
-        # print("Finding valid rho")
+    def find_valid_rho(self, x_data, y_data, starting_rho=8):
         rho_test = starting_rho
         if starting_rho is None:
             rho_test = 10
         saturation = self.calculate_rho_saturation(x_data, y_data, rho_test)
         prev_rho = rho_test
+        """
+        Saturation of 0 -> not going to get a better rho, should just change threshold [done later after function is called]
+        """
         if saturation < 0.0001:
             # print("Invalid Rho Saturation")
             return -1
-        max_iteration = 200
+        MAX_ITERATIONS = 200
         current_iteration = 0
         # print("Starting Rho Finding")
-        while saturation > 0.0001 and current_iteration < max_iteration:
+        while saturation > 0.0001 and current_iteration < MAX_ITERATIONS:
             # print("Rho finding iteration")
             current_iteration = current_iteration + 1
             prev_rho = rho_test
             # [NOTE] What is a good learn percentage
-            rho_test = rho_test - rho_test * 0.1
+            rho_test = rho_test - rho_test * 0.2
             saturation = self.calculate_rho_saturation(
                 x_data, y_data, rho_test)
         return prev_rho
     # Rho should be set so the detector score saturates at 1 for a small percent of time
     # Paper says 0.1%
 
+    """
+    Given a rho, find out how saturated the data will be
+    """
+
     def calculate_rho_saturation(self, x_data, y_data, rho):
         # print("Calculating Saturation")
         saturation = 0
-        actual_diss = []
         left_sum = np.sum(y_data[0:1])
         right_sum = np.sum(y_data[1:])
         left_size = 1
@@ -234,11 +246,17 @@ class Detector:
             lambda_q = right_sum / right_size
             dissimilarity = self.squared_hellinger_distance(
                 lambda_p, lambda_q, rho)
-            actual_diss.append(dissimilarity)
+            """
+            Add to saturated count if it is above some dissimilarity metric
+            """
             if dissimilarity > 0.9:
                 saturation += 1
         # print("Finished Calculating Saturation")
         return float(saturation / len(x_data))
+
+    """
+    Calculate how many points will score above a threshold
+    """
 
     def calculate_num_above_threshold(self, x_data, y_data, rho, threshold):
         above_threshold = 0
@@ -268,7 +286,8 @@ class Detector:
             x_data, y_data, rho, thresh_test)
         flip_directions = 1
         iterations = 0
-        while above_thresh < desired_threshold and iterations < 500:
+        MAX_ITERATIONS = 250
+        while above_thresh < desired_threshold and iterations < MAX_ITERATIONS:
             iterations = iterations + 1
             if above_thresh < 0.0000001:
                 flip_directions = -1
@@ -293,7 +312,6 @@ class Detector:
                 x_data, y_data, rho=default_rho, threshold_start=0.9, desired_threshold=desired_threshold)
         points = []
         point_diss = dict()
-        avg_diss = []
         left_sum = np.sum(y_data[0:1])
         right_sum = np.sum(y_data[1:])
         left_size = 1
@@ -308,13 +326,23 @@ class Detector:
             lambda_q = right_sum / right_size
             dissimilarity = self.squared_hellinger_distance(
                 lambda_p, lambda_q, rho)
-            avg_diss.append(dissimilarity)
             point_diss.update({idx: dissimilarity})
         ordered_diss = sorted(point_diss.items(),
                               key=lambda x: x[1], reverse=True)
         ordered_diss = ordered_diss[:int(0.035*len(x_data))]
         uniq_points = []
         for tup in ordered_diss:
+            """
+            The tuple points:
+            0-> X coordinate
+            1-> Y coordiante
+            2-> Mean of current interval
+            3-> Mean of y-data
+            4-> Max of y-data
+            5-> Min of y-data
+            6-> Max of x-data
+            7-> Min of x-data
+            """
             points.append(
                 [x_data[tup[0]], y_data[tup[0]], interval_mean, y_data_mean, y_data_max, y_data_min, x_data_max, x_data_min])
             uniq_points.append(tup[1])
@@ -350,7 +378,8 @@ class Detector:
         x_data, y_data = self.get_data_interval(right_index, width)
         X_DATA_LEN = len(x_data)
         Y_DATA_LEN = len(y_data)
-        if len(x_data) == 0 or len(y_data) == 0:
+        if X_DATA_LEN == 0 or Y_DATA_LEN == 0:
+            print("[find_unique_events]: No Data")
             return []
         print("[find_unique_events]: Acquired Data")
         # Used to chunk each interval

@@ -55,6 +55,7 @@ class HierarchalManager:
         elif files is not None:
             starting_layer = DetectorLayer(1)
             for file in files:
+                print(file)
                 starting_layer.add_detector(
                     "low-level", self.mNext_available_id, file_name=file, lower_level_detectors=[])
                 self.mNext_available_id += 1

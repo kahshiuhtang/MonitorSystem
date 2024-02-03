@@ -233,12 +233,13 @@ def threaded_function(detector, interval_index, target, result, lock):
     ans = detector.find_unique_events(
         right_index=interval_index, width=min(interval_index, 400), target_ev=target)
     print("[threaded_function]: Waiting for lock.")
+    print(ans)
     with lock:
         result.update({detector.mID: ans})
         print("[threaded_function]: Releasing lock.")
 
 
-def multithreaded_stream(num_detectors, start_interval):
+def multithreaded_stream(num_detectors, start_interval, total_intervals):
     """
     Pull the data from the database that we run the ALGO on
     """
@@ -250,13 +251,13 @@ def multithreaded_stream(num_detectors, start_interval):
     """
     For every non-overlapping chunk, we want to create a thread that finds the 
     """
-    for iteration in range(start_interval, 16):
+    for iteration in range(start_interval, total_intervals):
         result_queue = dict()
         STARTING_INTERVAL_INDEX = iteration * 50
         lock = threading.Lock()
         threads = []
         for i in range(num_detectors):
-            current_detector = hManager.mLayers[0].mDetector_map[11]
+            current_detector = hManager.mLayers[0].mDetector_map[str(i)]
             thread = threading.Thread(
                 target=threaded_function, args=(current_detector, STARTING_INTERVAL_INDEX, TARGET, result_queue, lock))
             threads.append(thread)
@@ -281,32 +282,34 @@ def multithreaded_stream(num_detectors, start_interval):
         """
         For every detector, we want to plot it and the interval it just searched
         """
+        TIME_DIFFERENCE_PER_POINT = 600000
         for i in range(num_detectors):
-            current_detector = hManager.mLayers[0].mDetector_map[i]
+            current_detector = hManager.mLayers[0].mDetector_map[str(i)]
             interval_index = 50*(iteration - 2)
             x_data, y_data = current_detector.get_used_data(
                 right_index=interval_index, width=min(interval_index, 400))
-            plt.subplot(4, 3, i+1)
+            plt.subplot(4, 3, 12)
             plt.plot(x_data, y_data)
             anomalies_found = []
             if current_detector.mID in result_queue:
                 anomalies_found = result_queue[current_detector.mID]
+            """
+            If there were any anomalies in this detector, verify that it was found in another detector
+            """
             if len(anomalies_found) > 0:
                 for anomaly in anomalies_found:
                     count = queue_counter[anomaly]
                     for i in range(1, 5):  # Parameter, give small window of points
-                        if current_detector.mID == 3 or current_detector.mID == 1:
-                            print(str(float(anomaly) - 600000*i))
-                        if (float(anomaly) - 600000*i) in queue_counter:
+                        if (float(anomaly) - TIME_DIFFERENCE_PER_POINT*i) in queue_counter:
                             count = 2
-                            count += queue_counter[(float(anomaly) - 600000*i)]
+                            count += queue_counter[(float(anomaly) -
+                                                    TIME_DIFFERENCE_PER_POINT*i)]
                     for i in range(1, 5):
-                        if (float(anomaly) + 600000*i) in queue_counter:
+                        if (float(anomaly) + TIME_DIFFERENCE_PER_POINT*i) in queue_counter:
                             count = 2
-                            count += queue_counter[(float(anomaly) + 600000*i)]
+                            count += queue_counter[(float(anomaly) +
+                                                    TIME_DIFFERENCE_PER_POINT*i)]
                     if count > 1:
-                        if current_detector.mID == 3 or current_detector.mID == 1:
-                            print(anomaly)
                         plt.plot(anomaly, np.mean(y_data), marker="x", markersize=5,
                                  markeredgecolor="red", markerfacecolor="green")
 
@@ -315,4 +318,23 @@ def multithreaded_stream(num_detectors, start_interval):
         print(result_queue)
 
 
-multithreaded_stream(6, 0)
+def stream_events_ll():
+    hManager = HierarchalManager()
+    files = []
+
+    path = r'pci-slowdown-data'
+    extension = '.csv'
+
+    for root, dirs_list, files_list in os.walk(path):
+        for file_name in files_list:
+            if os.path.splitext(file_name)[-1] == extension:
+                file_name_path = os.path.join(root, file_name)
+                files.append("pci-slowdown-data/" + file_name)
+    hManager.create_base_layer(files=files)
+    target = 1
+    for detector in hManager.mLayers[0].mDetector_map.values():
+        detector.graph()
+
+
+stream_events_ll()
+# multithreaded_stream(num_detectors=56, start_interval=0, total_intervals=16)
