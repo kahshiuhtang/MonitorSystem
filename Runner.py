@@ -71,7 +71,7 @@ class Runner:
                 """DELETE FROM {} WHERE data_id > 0""".format(db_name))
         self.conn.commit()
 
-    def pull_metrics(self, query_url, query, time, isGPU):
+    def pull_metric(self, query_url, query, time, isGPU):
         time = "[3h]"
         query_url = f'{query_url}/api/v1/query?query={query}{time}'
         print(query_url)
@@ -128,7 +128,7 @@ class Runner:
                                     arr)
         self.conn.commit()
 
-    def find_all_unique(self,  table, column_name):
+    def find_all_unique_gpu_instance_combos(self,  table, column_name):
         if len(column_name) == 2:
             self.cursor.execute(
                 """SELECT DISTINCT {}, {} FROM  {} WHERE realtime_col >= NOW() - INTERVAL '200 days' ORDER BY {}, {};""".format(column_name[0], column_name[1], table, column_name[0], column_name[1]))
@@ -165,9 +165,9 @@ class Runner:
         results = self.cursor.fetchall()
         return results
 
-    def run(self):
+    def pull_from_prometheus(self):
         for query in self.queries:
-            data = self.pull_metrics('http://localhost:9090',
+            data = self.pull_metric('http://localhost:9090',
                                      query["query"], query["time"], query["gpu_metric"])
             value_names = "(timestamp_col, instance, value_col)"
             value_types = "(%s, %s, %s)"
@@ -177,13 +177,13 @@ class Runner:
             self.store_metrics(query["db_name"],
                                value_names, value_types, data)
 
-    def pull(self, instance="130.245.176.67:9400", gpu="1"):
+    def pull_from_db(self, instance="130.245.176.67:9400", gpu="1"):
         total_count = 0
         layer = 1
         detectors = []
         for query in self.queries:
             if query["gpu_metric"] == "true":
-                unique_pairs = self.find_all_unique(query["db_name"], [
+                unique_pairs = self.find_all_unique_gpu_instance_combos(query["db_name"], [
                     "gpu", "instance"])
                 for pair in unique_pairs:
                     data = self.load_from_database(query["db_name"], pair)
@@ -194,7 +194,7 @@ class Runner:
                     total_count += 1
                     detect.graph()
             else:
-                unique_pairs = self.find_all_unique(query["db_name"], [
+                unique_pairs = self.find_all_unique_gpu_instance_combos(query["db_name"], [
                     "instance"])
                 for pair in unique_pairs:
                     data = self.load_from_database(query["db_name"], pair)
@@ -206,13 +206,6 @@ class Runner:
                     detect.graph()
         return detectors
 
-    def pipeline(self):
-        # self.clear_database()
-        # self.run()
-        det = self.pull()
-        # self.run_cluster(det)
-        self.shutdown()
-
     def run_cluster(self, detectors):
         manager = DetectorLayer(1)
         for detector in detectors:
@@ -221,11 +214,11 @@ class Runner:
         g.create_new_layer(1)
 
     def TEST_pull_metric(self, idx):
-        print(json.dumps(self.pull_metrics('http://localhost:9090',
+        print(json.dumps(self.pull_metric('http://localhost:9090',
                                            self.queries[idx]["query"], self.queries[idx]["time"], self.queries[idx]["gpu_metric"]), indent=1))
 
     def TEST_store_metric(self, idx):
-        data = self.pull_metrics('http://localhost:9090',
+        data = self.pull_metric('http://localhost:9090',
                                  self.queries[idx]["query"], self.queries[idx]["time"], self.queries[idx]["gpu_metric"])
         value_names = "(timestamp_col, instance, value_col)"
         value_types = "(%s, %s, %s)"
@@ -239,6 +232,13 @@ class Runner:
     def TEST_load_from_database(self, table, time_start, time_end):
         print(self.load_from_database(table, time_start, time_end))
 
+    def pipeline(self):
+        # self.clear_database()
+        # self.pull_from_prometheus()
+        det = self.pull_from_db()
+        # self.run_cluster(det)
+        self.shutdown()
+
 
 # Doesn't work for 0 (no epoch time)
 # DCGM_FI_PROF_SM_OCCUPANCY, 11 doesnt work -> maybe because DCGM
@@ -246,7 +246,7 @@ class Runner:
 run = Runner()
 run.pipeline()
 # clear_database(cursor, conn, queries)
-# print(json.dumps(pull_metrics('http://localhost:9090',
+# print(json.dumps(pull_metric('http://localhost:9090',
 #   'node_memory_Buffers_bytes{job="node-exporter"}', '[15m]'), indent=2))
 # TEST_store_metric(8, cursor, conn)
 # TEST_load_from_database(cursor, conn, "gpu_temp", 1701874891.33, 1701875101.33)
