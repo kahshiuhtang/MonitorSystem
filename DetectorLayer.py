@@ -12,15 +12,6 @@ class DetectorLayer:
         self.mCurrentTime = 1
         self.mLayerNumber = layer_number
 
-    # Calls the next() method in all of the Detector objects being tracked
-    def next(self):
-        print("Current Time::" + str(self.mCurrentTime))
-        for detector in self.mDetector_map:
-            self.mDetector_map[detector].next(self.mCurrentTime)
-        print("------------------------------------")
-        self.mCurrentTime += 1
-        return
-
     # Add a detector that is being watched
     def add_detector(self, detector_type, detector_id, file_name=None, loaded_data=None, interval=None, lower_level_detectors=None):
         temp_detector = Detector(
@@ -41,30 +32,6 @@ class DetectorLayer:
     def delete_detector(self, id):
         if id in self.mDetector_map:
             del self.mDetector_map[id]
-            return True
-        return False
-
-    # Calls next() function repeatedly for duration of timestamp, works on all detectors
-    def start(self, start_timestamp, end_timestamp):
-        if end_timestamp < start_timestamp:
-            print("Cannot end timestamp before it starts")
-            return
-        self.mCurrentTime = start_timestamp
-        for i in range(start_timestamp, end_timestamp):
-            self.next()
-        return
-
-    # Graph on detector data
-    def graph_by_id(self, id, x_range):
-        if id in self.mDetector_map:
-            self.mDetector_map[id].graph_data(x_range)
-            return True
-        return False
-
-    # Graph the anomaly data for a single detector by ID
-    def graph_anomaly_by_id(self, id, x_range=None):
-        if id in self.mDetector_map:
-            self.mDetector_map[id].graph_anomaly(x_range)
             return True
         return False
 

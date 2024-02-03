@@ -1,8 +1,6 @@
 import csv
 from Rule import Rule
 import matplotlib.pyplot as plt
-from sklearn.ensemble import IsolationForest
-from sklearn.inspection import DecisionBoundaryDisplay
 from sklearn.cluster import KMeans
 import numpy as np
 import math
@@ -17,7 +15,6 @@ class Detector:
         self.mID = id
         self.mHistory = dict()
         self.mColumns = []
-        self.mColumns_mapping = dict()
         self.mRules = []
         self.mDetectorLevel = detector_level
         self.mDetector_type = detector_type
@@ -30,62 +27,12 @@ class Detector:
         if gpu == None:
             self.mGPU = ""
 
-    def run_isolation_forest(self, x_data, y_data, method="i-forest", contamination=0.05):
-        if method == "i-forest":
-            x = np.array(x_data)
-            y = np.array(y_data)
-            data = np.column_stack((x, y))
-            clf = IsolationForest(contamination=contamination, random_state=4)
-            clf.fit(data)
-            outlier_labels = clf.predict(data)
-            mean = np.mean(y)
-            std = np.std(y)
-
-            anomaly_x_data = []
-            anomaly_y_data = []
-            z_score = []
-            print("Anomaly Z-Scores with contamination of "+str(contamination)+":")
-            for i in range(0, len(outlier_labels)):
-                if outlier_labels[i] == -1:
-                    anomaly_x_data.append(x_data[i])
-                    anomaly_y_data.append(y_data[i])
-                    z = (y_data[i] - mean) / std
-                    z_score.append(z)
-            return anomaly_x_data, anomaly_y_data
-
     # Some sort of rule system to check
     def add_rule(self, is_numeric, error_range):
         self.mRules.append(Rule(is_numeric, error_range))
 
     def check_rules(self, timestamp):
-        if not isinstance(self.mHistory[timestamp], list):
-            print("[Error]: No rules exist")
-            return False
-        for rule in self.mRules:
-            if rule.is_valid(self.mHistory[timestamp][self.mColumns_mapping["value"]]) == False:
-                return False
-        return True
-
-    # Used for simulating the data
-    def next(self, timestamp):
-        if len(self.mHistory) == 0:
-            print("Error: No data found")
-            return
-        if str(timestamp) in self.mHistory:
-            if self.mHistory[str(timestamp)][self.mColumns_mapping["is_anomaly"]] == "1":
-                self.alert(timestamp)
-            if self.check_rules(timestamp) == False:
-                self.alert(timestamp)
-            return self.mHistory[str(timestamp)]
-        print("Timestamp not within range for detector " + str(self.mID))
-
-    # Print out the detector ID and the anomaly
-    def alert(self, timestamp):
-        if len(self.mHistory) == 0:
-            print("Error: No data found")
-            return
-        if str(timestamp) in self.mHistory:
-            print("ALERT: Anomaly on detector " + str(self.mID))
+        pass
 
     # Load in the all data, X:timestamp, Y:all values
     def load_from_file(self, file_path):
@@ -95,56 +42,14 @@ class Detector:
             for row in reader:
                 try:
                     if count != 0 and len(row) >= 2:
-                        self.mHistory.update({row[0]: (row[1::])})
+                        self.mHistory.update({row[0]: (row[1])})
                     else:
-                        self.mColumns = row[1::]
+                        self.mColumns = row[1]
                         count += 1
                 except ValueError:
                     print("Error")
         self.map_columns()
         return
-
-    # Set up a mapping of the column names to the values
-    def map_columns(self):
-        for i in range(0, len(self.mColumns)):
-            self.mColumns_mapping.update({self.mColumns[i]: i})
-
-    # Retrieve all the data from a given timestamp
-    def get_all_values_from_timestamp(self, timestamp):
-        if str(timestamp) in self.mHistory:
-            return self.mHistory[str(timestamp)]
-
-    # Retrieve a field's value at a specific timestamp
-    def get_value_from_timestamp(self, timestamp, field_name):
-        if str(timestamp) in self.mHistory:
-            if field_name in self.mColumns_mapping:
-                return self.mHistory[str(timestamp)][self.mColumns_mapping[field_name]]
-            print("Field name does not exist")
-            return
-        print("Timestamp not available")
-
-    # Graph the values of a specific graph: also show the anomalies
-    def graph_data(self, x_range=None, method="ts", contam=0.05, num_clusters=2, rho=1):
-        x_data, y_data = self.create_data(x_range)
-        # plt.plot(x_data, y_data)
-        maxX = None
-        maxY = None
-        if method == "iso":
-            maxX, maxY = self.run_isolation_forest(
-                x_data, y_data, contamination=contam)
-        elif method == "std":
-            maxX, maxY = self.find_anomaly_std(x_data, y_data, 10)
-        elif method == "ts":
-            maxX, maxY = self.run_time_series(
-                x_data[240:360], y_data[240:360], rho=rho)
-        plt.plot(x_data, y_data)
-        for i in range(0, len(maxX)):
-            plt.plot(maxX[i], maxY[i], marker="x", markersize=5,
-                     markeredgecolor="red", markerfacecolor="green")
-        plt.xlabel('Timestamp')
-        plt.ylabel('Value')
-        plt.title('Values over time for detector:' + str(self.mID))
-        plt.show()
 
     def graph(self):
         x_data, y_data = self.create_data()
@@ -169,19 +74,16 @@ class Detector:
         for timestamp in self.mHistory:
             if (x_range is not None and x_range[0] <= int(timestamp) and int(timestamp) < x_range[1]) or x_range is None:
                 x_data.append(int(timestamp))
-                if isinstance(self.mHistory[timestamp], list):
-                    y_data.append(float(
-                        self.mHistory[timestamp][0]))
-                else:
-                    y_data.append(float(self.mHistory[timestamp]))
+                y_data.append(float(self.mHistory[timestamp]))
         self.mX_data = x_data
         self.mY_data = y_data
         return x_data, y_data
 
     def load_from_memory(self, timestamps, data):
         for i in range(0, len(data)):
-            self.mHistory.update({timestamps[i]: [data[i]]})
-        return
+            self.mHistory.update({timestamps[i]: data[i]})
+        print("Successfully loaded from memory")
+        return True
 
     def save_history(self, file_location):
         with open(file_location, 'w', newline='') as file:
