@@ -29,7 +29,7 @@ This specifies you are running Prometheus locally on port 9090 and specifies the
 
 To setup PostgreSQL, you will need to setup a database with tables to store the metrics collected from Prometheus. This can be configured in the Streamer.py file or in the DBRunner.py file.
 
-![Example Database](images/Postgres.jpg.jpg)
+![Example Database](images/Postgres.jpg)
 
 
 To run the AlertManager in a Docker container, run:
