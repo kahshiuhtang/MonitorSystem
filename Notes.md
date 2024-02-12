@@ -51,12 +51,20 @@ Methods:
 4) In each detector keep track of the x-coords of points every time you run step 3
 5) To verify true anomalies, if a region shows up more than once, it is called an anomaly
 
-Issues: 
-Kind of slow
-Only one point per window
-Complexity
-Worker Node has Pods, which has containers
-kubelet
-etcd: permananent statet about clusters
-Scheduler: Avai
+
+1) Looking into hierarchal monitoring system
+    A) Originally thought it was the amount of data
+    B) Presence of Outliers
+    C) Data is not normally distributed -> straight lines and cycles
+        D) A lot of things assoicated with not helpful data
+    E) Still think you should have it
+        *) Cluster similar metrics into one
+        *) View known relationships
+        *) group without cluster?
+2) Caching metrics -> DCGM
+    A) job 
+3) Time complexity -> Reduced
+    A) Stuff is taking too long to run
+    B) Spends too much time on non-interesting data
+    C) Max Iterations
 

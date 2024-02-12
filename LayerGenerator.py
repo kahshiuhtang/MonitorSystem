@@ -53,21 +53,6 @@ class LayerGenerator:
     def group_and_cluster(self):
         return self.cluster(self.group())
 
-    def generate_new_detector_classifiers(self, detector_sets):
-        summed_data = []
-        for idx_array in detector_sets:
-            temp_array = []
-            for idx in detector_sets[idx_array]:
-                detector = self.mManager.mDetector_map[idx]
-                _, data = detector.create_data()
-                temp_array.append(data[0:700])  # TEMP fix
-            summed_data.append(temp_array)
-        for data_group in summed_data:
-            clf = linear_model.SGDOneClassSVM(random_state=42)
-            clf.fit(data_group)
-            self.mNew_detector_list.append(clf)
-        return
-
     def generate_new_detector_means(self, detector_sets):
         print("Started summing detector means for higher-level detectors")
         print(detector_sets)
@@ -115,12 +100,3 @@ class LayerGenerator:
             idx += 1
         print("Finished creating new layer, " + str(layer_level))
         return layer, self.mNext_available_id
-
-    def fuzzy_cluster(self):
-        X = self.mManager.generate_detector_data_array()
-        scaler = preprocessing.StandardScaler().fit(X)
-        X_scaled = scaler.transform(X)
-        cntr, u, u0, d, jm, p, fpc = fuzz.cluster.cmeans(
-            X_scaled, c=3, m=2, error=0.005, maxiter=1000, init=None
-        )
-        return

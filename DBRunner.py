@@ -26,13 +26,13 @@ GPU SM Clocks: DCGM_FI_DEV_SM_CLOCK{instance=~"${instance}", gpu=~"${gpu}", job=
 """
 
 
-class Runner:
-    def __init__(self):
-        self.conn = psycopg2.connect(database="kahshiuh",
-                                     host="localhost",
-                                     user="kahshiuh",
-                                     password="kahshiuh",
-                                     port="5432")
+class DBRunner:
+    def __init__(self, database, host, user, password, port):
+        self.conn = psycopg2.connect(database=database,
+                                     host=host,
+                                     user=user,
+                                     password=password,
+                                     port=port)
         self.cursor = self.conn.cursor()
         # {"name": "Time Per Epoch", "query": "epoch_time", "time": "[48h]", "db_name": "time_per_epoch", "gpu_metric": "false"}
         # {"name": "SM_Utilization","query": 'DCGM_FI_PROF_SM_OCCUPANCY', "time": "[5h]",  "db_name": "sm_utilization", "gpu_metric": "true"}
@@ -168,7 +168,7 @@ class Runner:
     def pull_from_prometheus(self):
         for query in self.queries:
             data = self.pull_metric('http://localhost:9090',
-                                     query["query"], query["time"], query["gpu_metric"])
+                                    query["query"], query["time"], query["gpu_metric"])
             value_names = "(timestamp_col, instance, value_col)"
             value_types = "(%s, %s, %s)"
             if query["gpu_metric"] == "true":
@@ -192,7 +192,7 @@ class Runner:
                     # if instance == pair[1] and gpu == pair[0]:
                     detectors.append(detect)
                     total_count += 1
-                    detect.graph()
+                    # detect.graph()
             else:
                 unique_pairs = self.find_all_unique_gpu_instance_combos(query["db_name"], [
                     "instance"])
@@ -203,7 +203,7 @@ class Runner:
                     # if instance == pair[0]:
                     detectors.append(detect)
                     total_count += 1
-                    detect.graph()
+                    # detect.graph()
         return detectors
 
     def run_cluster(self, detectors):
@@ -215,11 +215,11 @@ class Runner:
 
     def TEST_pull_metric(self, idx):
         print(json.dumps(self.pull_metric('http://localhost:9090',
-                                           self.queries[idx]["query"], self.queries[idx]["time"], self.queries[idx]["gpu_metric"]), indent=1))
+                                          self.queries[idx]["query"], self.queries[idx]["time"], self.queries[idx]["gpu_metric"]), indent=1))
 
     def TEST_store_metric(self, idx):
         data = self.pull_metric('http://localhost:9090',
-                                 self.queries[idx]["query"], self.queries[idx]["time"], self.queries[idx]["gpu_metric"])
+                                self.queries[idx]["query"], self.queries[idx]["time"], self.queries[idx]["gpu_metric"])
         value_names = "(timestamp_col, instance, value_col)"
         value_types = "(%s, %s, %s)"
         if self.queries[idx]["gpu_metric"] == "true":
@@ -243,8 +243,8 @@ class Runner:
 # Doesn't work for 0 (no epoch time)
 # DCGM_FI_PROF_SM_OCCUPANCY, 11 doesnt work -> maybe because DCGM
 # TEST_pull_metric(11)
-run = Runner()
-run.pipeline()
+# run = DBRunner()
+# run.pipeline()
 # clear_database(cursor, conn, queries)
 # print(json.dumps(pull_metric('http://localhost:9090',
 #   'node_memory_Buffers_bytes{job="node-exporter"}', '[15m]'), indent=2))

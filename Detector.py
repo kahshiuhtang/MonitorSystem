@@ -82,7 +82,7 @@ class Detector:
     def load_from_memory(self, timestamps, data):
         for i in range(0, len(data)):
             self.mHistory.update({timestamps[i]: data[i]})
-        print("Successfully loaded from memory")
+        # print("Successfully loaded from memory")
         return True
 
     def save_history(self, file_location):
@@ -98,7 +98,10 @@ class Detector:
         return True
 
     def squared_hellinger_distance(self, lambda_p, lambda_q, rho):
-        return 1 - math.e ** (-rho * ((math.sqrt(lambda_p) - math.sqrt(lambda_q)) ** 2) / 2)
+        try:
+            return 1 - math.e ** (-rho * ((math.sqrt(lambda_p) - math.sqrt(lambda_q)) ** 2) / 2)
+        except ValueError:
+            return 1
 
     def find_valid_rho(self, x_data, y_data, starting_rho=8):
         rho_test = starting_rho
@@ -132,7 +135,6 @@ class Detector:
     """
 
     def calculate_rho_saturation(self, x_data, y_data, rho):
-        # print("Calculating Saturation")
         saturation = 0
         left_sum = np.sum(y_data[0:1])
         right_sum = np.sum(y_data[1:])

@@ -1,4 +1,4 @@
-networkx
 matplotlib
 sklearn
 numpy
+requests
